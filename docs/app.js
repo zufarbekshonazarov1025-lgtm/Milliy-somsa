@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=6';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=7';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "6";
+const APP_V = "7";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -23,19 +23,21 @@ const MONTHS = ["yanvar","fevral","mart","aprel","may","iyun","iyul","avgust","s
 const WDAYS = ["Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba"];
 const UNITS = { kg:{base:"g",f:1000,name:"kg"}, l:{base:"ml",f:1000,name:"l"}, ta:{base:"ta",f:1,name:"ta"} };
 const ICONS = {
+  dashboard:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  koproq:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   bugun:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
   yetkazish:'<path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
   ombor:'<path d="M21 8 12 3 3 8v13h18z"/><path d="M7 21v-8h10v8"/>',
   hisob:'<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M21 20H3"/>',
   sozlama:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'
 };
-const TAB_NAMES = { bugun:"Bugun", yetkazish:"Yetkazish", ombor:"Ombor", hisob:"Hisob", sozlama:"Sozlama" };
+const TAB_NAMES = { dashboard:"Dashboard", koproq:"Ko'proq", bugun:"Bugun", yetkazish:"Yetkazish", ombor:"Ombor", hisob:"Hisob", sozlama:"Sozlama" };
 
-const S = { types:{}, ings:{}, clients:{}, days:{}, moves:{}, debts:{}, config:{zaxira:2}, profiles:{} };
+const S = { types:{}, ings:{}, clients:{}, days:{}, moves:{}, debts:{}, payments:{}, expenses:{}, config:{zaxira:2}, profiles:{} };
 const LOGIN_DOMAIN = "milliysomsa.uz";
 const ROLE_NAMES = { admin:"Admin", ishchi:"Ishchi", kuzatuvchi:"Kuzatuvchi" };
 const K = { date:null, data:null, loading:false };   // kuzatuvchi dashboardi uchun
-let session = null, me = null, preview = null, tab = "bugun", viewDate = ymd(new Date()), selType = null, period = "bugun";
+let session = null, me = null, preview = null, tab = "dashboard", viewDate = ymd(new Date()), selType = null, period = "bugun";
 const drafts = {}, pendingOrders = {};
 let orderTimer = null, ready = false, channel = null;
 
@@ -56,6 +58,7 @@ function byOrder(obj){return Object.entries(obj).map(([id,v])=>({id,...v})).sort
 const types=()=>byOrder(S.types), clients=()=>byOrder(S.clients), ings=()=>byOrder(S.ings);
 function cprice(c,tid){const p=c&&c.prices&&c.prices[tid];return +p||(+(S.types[tid]||{}).price||0)}
 function typeCost(t){return (t.recipe||[]).reduce((s,r)=>{const i=S.ings[r.ing];return s+(i?r.qty*ppb(i):0)},0)}
+function clientOf(id){return S.clients[id]?{id,...S.clients[id]}:null}
 function day(d){return S.days[d]||{orders:{},deliveries:{},consumed:{}}}
 function ordersOf(d){return pendingOrders[d]||day(d).orders||{}}
 function sumObj(o){return Object.values(o||{}).reduce((s,v)=>s+(+v||0),0)}
@@ -68,23 +71,26 @@ const isMother=()=>role()!=="admin";
 function dayKeys(){return Object.keys(S.days).sort()}
 function prevDelivery(cid,d){const ks=dayKeys();for(let i=ks.length-1;i>=0;i--){const k=ks[i];if(k>=d)continue;const dl=(S.days[k].deliveries||{})[cid];if(dl&&dl.done)return {date:k,...dl}}return null}
 function nextReturned(cid,d){for(const k of dayKeys()){if(k<=d)continue;const dl=(S.days[k].deliveries||{})[cid];if(dl&&dl.done)return dl.returned||{}}return false}
-function clientBalance(cid,upto){const c=S.clients[cid]||{};let b=+c.startDebt||0;for(const k of dayKeys()){if(upto&&k>upto)break;const dl=(S.days[k].deliveries||{})[cid];if(dl&&dl.done)b+=(dl.givenSum||0)-(dl.retSum||0)-(dl.paid||0)}return b}
+function clientBalance(cid,upto){const c=S.clients[cid]||{};let b=+c.startDebt||0;for(const k of dayKeys()){if(upto&&k>upto)break;const dl=(S.days[k].deliveries||{})[cid];if(dl&&dl.done)b+=(dl.givenSum||0)-(dl.retSum||0)-(dl.paid||0)}
+  for(const p of Object.values(S.payments)){if(p.client===cid&&(!upto||p.date<=upto))b-=p.amount}return b}
 function avgDaily(iid){const ks=dayKeys().filter(k=>k<=ymd(new Date())).slice(-7);let s=0,n=0;for(const k of ks){const c=(S.days[k].consumed||{})[iid];if(c){s+=c;n++}}return n?s/n:0}
 function svg(name){return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICONS[name]+'</svg>'}
 async function run(p,okMsg){const r=await p;if(r&&r.error){console.error(r.error);toast("Saqlanmadi: internetni tekshiring");throw r.error}if(okMsg)toast(okMsg);return r}
 
 /* ---------- loading data ---------- */
 const LOAD = {
-  ings: async()=>{const {data}=await sb.from("ingredients").select("*");S.ings=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,unit:r.unit,packQty:+r.pack_qty,packPrice:+r.pack_price,min:+r.min,stock:+r.stock,order:r.sort}]))},
-  types: async()=>{const {data}=await sb.from("somsa_types").select("*");S.types=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,price:+r.price,order:r.sort,recipe:r.recipe||[]}]))},
-  clients: async()=>{const {data}=await sb.from("clients").select("*");S.clients=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,place:r.place,when:r.when_text,order:r.sort,types:r.types||[],prices:r.prices||{},payMode:r.pay_mode,startDebt:+r.start_debt}]))},
-  days: async()=>{const {data}=await sb.from("days").select("*");S.days=Object.fromEntries((data||[]).map(r=>[r.date,{orders:r.orders||{},deliveries:r.deliveries||{},consumed:r.consumed||{}}]))},
-  moves: async()=>{const {data}=await sb.from("moves").select("*").order("at",{ascending:false}).limit(500);S.moves=Object.fromEntries((data||[]).map(r=>[r.id,{kind:r.kind,date:r.date,items:r.items||[],total:+r.total,at:r.at}]))},
-  debts: async()=>{const {data}=await sb.from("debts").select("*");S.debts=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,amount:+r.amount,note:r.note,date:r.date}]))},
-  config: async()=>{const {data}=await sb.from("settings").select("*").eq("key","main").maybeSingle();S.config=(data&&data.value)||{zaxira:2}},
-  profiles: async()=>{const {data}=await sb.from("profiles").select("*");S.profiles=Object.fromEntries((data||[]).map(r=>[r.id,r]))}
+  ings: async()=>{const {data,error}=await sb.from("ingredients").select("*");if(error)throw error;S.ings=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,unit:r.unit,packQty:+r.pack_qty,packPrice:+r.pack_price,min:+r.min,stock:+r.stock,order:r.sort}]))},
+  types: async()=>{const {data,error}=await sb.from("somsa_types").select("*");if(error)throw error;S.types=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,price:+r.price,order:r.sort,recipe:r.recipe||[]}]))},
+  clients: async()=>{const {data,error}=await sb.from("clients").select("*");if(error)throw error;S.clients=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,place:r.place,when:r.when_text,order:r.sort,types:r.types||[],prices:r.prices||{},payMode:r.pay_mode,startDebt:+r.start_debt}]))},
+  days: async()=>{const {data,error}=await sb.from("days").select("*");if(error)throw error;S.days=Object.fromEntries((data||[]).map(r=>[r.date,{orders:r.orders||{},deliveries:r.deliveries||{},consumed:r.consumed||{}}]))},
+  moves: async()=>{const {data,error}=await sb.from("moves").select("*").order("at",{ascending:false}).limit(500);if(error)throw error;S.moves=Object.fromEntries((data||[]).map(r=>[r.id,{kind:r.kind,date:r.date,items:r.items||[],total:+r.total,at:r.at}]))},
+  debts: async()=>{const {data,error}=await sb.from("debts").select("*");if(error)throw error;S.debts=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,amount:+r.amount,note:r.note,date:r.date}]))},
+  config: async()=>{const {data,error}=await sb.from("settings").select("*").eq("key","main").maybeSingle();if(error)throw error;S.config=(data&&data.value)||{zaxira:2}},
+  payments: async()=>{const {data,error}=await sb.from("payments").select("*");if(error)throw error;S.payments=Object.fromEntries((data||[]).map(r=>[r.id,{client:r.client_id,date:r.date,amount:+r.amount,note:r.note,at:r.at}]))},
+  expenses: async()=>{if(!isAdmin()){S.expenses={};return}const {data,error}=await sb.from("expenses").select("*");if(error)throw error;S.expenses=Object.fromEntries((data||[]).map(r=>[r.id,{date:r.date,category:r.category,amount:+r.amount,note:r.note,at:r.at}]))},
+  profiles: async()=>{const {data,error}=await sb.from("profiles").select("*");if(error)throw error;S.profiles=Object.fromEntries((data||[]).map(r=>[r.id,r]))}
 };
-const TABLE_KEY = { ingredients:"ings", somsa_types:"types", clients:"clients", days:"days", moves:"moves", debts:"debts", settings:"config" };
+const TABLE_KEY = { ingredients:"ings", somsa_types:"types", clients:"clients", days:"days", moves:"moves", debts:"debts", settings:"config", payments:"payments", expenses:"expenses" };
 async function loadAll(){
   await LOAD.profiles();me=S.profiles[session.user.id]||{role:"kuzatuvchi",name:""};
   if(isStaff())await Promise.all(Object.entries(LOAD).filter(([k])=>k!=="profiles").map(([,f])=>f()));
@@ -97,10 +103,46 @@ function subscribe(){
   if(channel)sb.removeChannel(channel);
   channel=sb.channel("somsa");
   for(const t of Object.keys(TABLE_KEY)){
-    channel.on("postgres_changes",{event:"*",schema:"public",table:t},async()=>{await LOAD[TABLE_KEY[t]]();render()});
+    channel.on("postgres_changes",{event:"*",schema:"public",table:t},async()=>{try{await LOAD[TABLE_KEY[t]]();applyQueued();saveCache();render()}catch(e){}});
   }
   channel.subscribe();
 }
+
+/* ---------- internetsiz ishlash: navbat va kesh ---------- */
+const QKEY="somsa_queue_v1", CKEY="somsa_cache_v1";
+function qGet(){try{return JSON.parse(localStorage.getItem(QKEY)||"[]")}catch(e){return []}}
+function qSet(q){try{localStorage.setItem(QKEY,JSON.stringify(q))}catch(e){}if(ready)renderBrandbar()}
+const isNetErr=e=>!navigator.onLine||/fetch|network|load failed|timeout|abort/i.test(String((e&&(e.message||e))||""));
+function exec(op){
+  if(op.k==="day")return sb.from("days").upsert(op.row);
+  if(op.k==="stock")return sb.rpc("adjust_stock",{changes:op.changes});
+  if(op.k==="pay")return sb.from("payments").insert(op.row);
+  return Promise.resolve({error:null});
+}
+/* Internet bo'lsa darhol yuboradi; bo'lmasa telefonda navbatga qo'yadi va keyin o'zi yuboradi. */
+async function sendOrQueue(op,okMsg){
+  if(navigator.onLine){
+    const r=await Promise.resolve(exec(op)).catch(e=>({error:e}));
+    if(!r.error){if(okMsg)toast(okMsg);return true}
+    if(!isNetErr(r.error)){console.error(r.error);toast("Saqlanmadi: "+(r.error.message||"xato"));throw r.error}
+  }
+  let q=qGet();if(op.k==="day")q=q.filter(x=>!(x.k==="day"&&x.row.date===op.row.date));q.push(op);qSet(q);
+  toast("Internet yo'q — telefonda saqlandi, internet chiqqanda yuboriladi");return false;
+}
+let flushing=false;
+async function flushQueue(){
+  if(flushing||!session||!navigator.onLine)return;const q=qGet();if(!q.length)return;flushing=true;
+  const rest=[];for(const op of q){const r=await Promise.resolve(exec(op)).catch(e=>({error:e}));if(r.error&&isNetErr(r.error))rest.push(op)}
+  qSet(rest);flushing=false;
+  if(rest.length<q.length){toast("Saqlanmagan amallar yuborildi");refresh()}
+}
+function applyQueued(){for(const op of qGet()){if(op.k==="day")S.days[op.row.date]={orders:op.row.orders,deliveries:op.row.deliveries,consumed:op.row.consumed};if(op.k==="pay")S.payments[op.row.id]={client:op.row.client_id,date:op.row.date,amount:+op.row.amount,note:op.row.note}}}
+function saveCache(){try{const lim=addDays(ymd(new Date()),-60);const days=Object.fromEntries(Object.entries(S.days).filter(([k])=>k>=lim));
+  localStorage.setItem(CKEY,JSON.stringify({uid:session.user.id,at:Date.now(),S:{...S,days}}))}catch(e){}}
+function loadCache(){try{const c=JSON.parse(localStorage.getItem(CKEY)||"null");if(c&&c.uid===session.user.id){Object.assign(S,c.S);me=S.profiles[session.user.id]||null;return !!me}}catch(e){}return false}
+window.addEventListener("online",()=>{flushQueue();if(ready)renderBrandbar()});
+window.addEventListener("offline",()=>{if(ready)renderBrandbar()});
+setInterval(flushQueue,20000);
 
 /* ---------- consumption & stock ---------- */
 function requirement(orders){
@@ -112,7 +154,7 @@ function requirement(orders){
 async function saveDay(d,patch){
   const cur=day(d);const row={date:d,orders:cur.orders||{},deliveries:cur.deliveries||{},consumed:cur.consumed||{},updated_at:new Date().toISOString(),...patch};
   S.days[d]={orders:row.orders,deliveries:row.deliveries,consumed:row.consumed};
-  return run(sb.from("days").upsert(row));
+  return sendOrQueue({k:"day",row});
 }
 async function saveOrders(d){
   const orders=pendingOrders[d];if(!orders)return;
@@ -120,7 +162,7 @@ async function saveOrders(d){
   for(const iid of new Set([...Object.keys(oldC),...Object.keys(newC)])){const delta=(newC[iid]||0)-(oldC[iid]||0);if(Math.abs(delta)>1e-9&&S.ings[iid])changes[iid]=-delta}
   try{
     await saveDay(d,{orders,consumed:newC});
-    if(Object.keys(changes).length)await run(sb.rpc("adjust_stock",{changes}));
+    if(Object.keys(changes).length)await sendOrQueue({k:"stock",changes});
     delete pendingOrders[d];render();
   }catch(e){}
 }
@@ -142,7 +184,8 @@ function splash(msg){
 }
 function renderBrandbar(){
   const sw=isAdmin()?'<button class="mswitch '+(preview?"on":"")+'" data-act="mother" aria-label="Ko\'rinishni almashtirish">Ko\'rinish: '+ROLE_NAMES[role()]+'</button>':"";
-  document.getElementById("brandbar").innerHTML=lockupH(28,'#162538')+sw;
+  const qn=qGet().length;const net=(!navigator.onLine||qn)?'<span class="pill '+(navigator.onLine?"warn":"bad")+'" role="status">'+(navigator.onLine?"":"Internet yo'q")+(qn?(navigator.onLine?"":" · ")+qn+" ta amal kutmoqda":"")+'</span>':"";
+  document.getElementById("brandbar").innerHTML=lockupH(28,'#162538')+'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">'+net+sw+'</div>';
 }
 function render(){
   const main=document.getElementById("main");
@@ -154,13 +197,14 @@ function render(){
     if(K.date!==viewDate&&!K.loading){fetchKuzatuv(viewDate)}
     main.innerHTML=vKuzatuv();return;
   }
-  const allowed=isMother()?["bugun","yetkazish"]:["bugun","yetkazish","ombor","hisob","sozlama"];
-  if(!allowed.includes(tab))tab="bugun";
+  const allowed=isMother()?["bugun","yetkazish"]:["dashboard","bugun","yetkazish","ombor","koproq"];
+  const inMore=["hisob","sozlama"].includes(tab);
+  if(!allowed.includes(tab)&&!(inMore&&!isMother()))tab=isMother()?"bugun":"dashboard";
   const nav=document.getElementById("navin");
   nav.style.gridTemplateColumns="repeat("+allowed.length+",minmax(0,1fr))";
-  nav.innerHTML=allowed.map(k=>'<button data-act="tab" data-k="'+k+'" class="'+(tab===k?"on":"")+'" aria-current="'+(tab===k?"page":"false")+'">'+svg(k)+TAB_NAMES[k]+'</button>').join("");
+  nav.innerHTML=allowed.map(k=>'<button data-act="tab" data-k="'+k+'" class="'+((tab===k||(k==="koproq"&&inMore))?"on":"")+'" aria-current="'+(tab===k?"page":"false")+'">'+svg(k)+TAB_NAMES[k]+'</button>').join("");
   document.getElementById("nav").hidden=false;
-  const fn={bugun:vBugun,yetkazish:vYetkazish,ombor:vOmbor,hisob:vHisob,sozlama:vSozlama}[tab];
+  const fn={dashboard:vDashboard,koproq:vKoproq,bugun:vBugun,yetkazish:vYetkazish,ombor:vOmbor,hisob:vHisob,sozlama:vSozlama}[tab];
   const y=window.scrollY;main.innerHTML=fn();window.scrollTo(0,y);
 }
 function renderLogin(){
@@ -178,6 +222,45 @@ function dateBar(){
   const t=ymd(new Date());const lab=viewDate===t?"Bugun":viewDate===addDays(t,1)?"Ertaga":viewDate===addDays(t,-1)?"Kecha":"";
   const arrow=d=>'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="'+d+'"/></svg>';
   return '<div class="datebar"><button class="icon" data-act="date" data-n="-1" aria-label="Oldingi kun">'+arrow("m15 18-6-6 6-6")+'</button><div class="d col"><span class="b">'+esc(lab||niceDate(viewDate))+'</span><span class="sub">'+esc(lab?niceDate(viewDate):shortDate(viewDate))+'</span></div><button class="icon" data-act="date" data-n="1" aria-label="Keyingi kun">'+arrow("m9 18 6-6-6-6")+'</button></div>';
+}
+
+/* DASHBOARD (admin): tan narx va foydasiz umumiy ko'rinish */
+function daySold(k){let g=0,r=0;const dd=S.days[k];if(!dd)return 0;for(const cid in dd.deliveries||{}){const dl=dd.deliveries[cid];if(!dl.done)continue;g+=sumObj(dl.given);const rr=nextReturned(cid,k);if(rr)r+=sumObj(rr)}return Math.max(0,g-r)}
+function monthStats(from,to){let rev=0,cnt=0;for(const k of dayKeys()){if(k<from||k>to)continue;for(const cid in S.days[k].deliveries||{}){const dl=S.days[k].deliveries[cid];if(!dl.done)continue;rev+=(dl.givenSum||0)-(dl.retSum||0);cnt+=sumObj(dl.given)-sumObj(dl.returned)}}return {rev,cnt}}
+function pct(a,b){if(!b)return "";const p=Math.round((a-b)/b*100);return '<span class="small" style="font-weight:700;color:'+(p>=0?"var(--ok)":"var(--bad)")+'">'+(p>=0?"▲ ":"▼ ")+Math.abs(p)+'% o\'tgan oydan</span>'}
+function vDashboard(){
+  const t=ymd(new Date());let h=header("Dashboard",niceDate(t));
+  const tot=sumObj(dayTypeTotals(t));const dels=(day(t).deliveries)||{};
+  const active=clients().filter(c=>sumObj(ordersOf(t)[c.id])>0||dels[c.id]);const doneN=active.filter(c=>(dels[c.id]||{}).done).length;
+  let cash=0;for(const cid in dels)if(dels[cid].done)cash+=dels[cid].paid||0;for(const p of Object.values(S.payments))if(p.date===t)cash+=p.amount;
+  const prog=active.length?Math.round(doneN/active.length*100):0;
+  h+='<div class="hero pat" role="button" tabindex="0" data-act="tab" data-k="bugun" style="cursor:pointer"><div class="grid2"><div><div class="lbl">Bugun yopiladi</div><div><span class="big num">'+tot+'</span> <span class="unit">ta</span></div></div><div><div class="lbl">Bugun tushgan pul</div><div class="xb num" style="font-size:24px;color:var(--orange);line-height:1.6">'+sp(cash)+'</div></div></div>'+
+    '<div><div class="lbl">Yetkazish: '+doneN+' / '+active.length+' do\'kon berildi</div><div class="bar" style="background:#2B4064;margin-top:6px;height:7px"><i style="width:'+prog+'%;background:var(--orange)"></i></div></div></div>';
+  const owed=clients().map(c=>clientBalance(c.id)).filter(b=>b>0);const owedSum=owed.reduce((a,b)=>a+b,0);
+  const debts=Object.values(S.debts);const debtSum=debts.reduce((a,d)=>a+(+d.amount||0),0);
+  const m0=t.slice(0,8)+"01";const pd=new Date(t+"T12:00:00");pd.setMonth(pd.getMonth()-1);const pt=ymd(pd);const pm0=pt.slice(0,8)+"01";
+  const cur=monthStats(m0,t),prv=monthStats(pm0,pt);
+  const tile=(lbl,val,sub,k)=>'<div class="card" role="button" tabindex="0" data-act="tab" data-k="'+k+'" style="gap:4px;cursor:pointer"><span class="small muted" style="font-weight:600">'+lbl+'</span><span class="xb num" style="font-size:20px">'+val+'</span>'+sub+'</div>';
+  h+='<div class="grid2">'+tile("Mijozlardagi pulim",sp(owedSum),'<span class="small muted">'+owed.length+' ta do\'konda</span>',"hisob")+tile("Bizning qarzlarimiz",sp(debtSum),'<span class="small muted">'+debts.length+' ta joyga</span>',"hisob")+
+    tile("Shu oy savdo",sp(cur.rev),pct(cur.rev,prv.rev),"hisob")+tile("Shu oy sotildi",sp(cur.cnt)+" ta",pct(cur.cnt,prv.cnt),"hisob")+'</div>';
+  // 7 kunlik grafik
+  const ds=[];for(let i=6;i>=0;i--){const k=addDays(t,-i);const z=Object.values(ordersOf(k)).reduce((a,o)=>a+sumObj(o),0);ds.push({k,z,s:k<t?daySold(k):0})}
+  const mx=Math.max(1,...ds.map(d=>Math.max(d.z,d.s)));const WD=["Ya","Du","Se","Ch","Pa","Ju","Sh"];
+  h+='<div class="card"><div class="sec"><span>Oxirgi 7 kun</span><span class="sub">somsa soni</span></div><div role="img" aria-label="Oxirgi 7 kunlik zakaz va sotilgan somsa" style="display:flex;align-items:flex-end;gap:8px;height:120px">'+ds.map(d=>'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%"><div style="flex:1;width:100%;display:flex;align-items:flex-end;gap:3px"><i title="Zakaz '+d.z+'" style="flex:1;display:block;border-radius:4px 4px 0 0;background:#D9DEE6;height:'+(d.z/mx*100)+'%"></i><i title="Sotildi '+d.s+'" style="flex:1;display:block;border-radius:4px 4px 0 0;background:var(--orange);height:'+(d.s/mx*100)+'%"></i></div><span class="small muted">'+WD[new Date(d.k+"T12:00:00").getDay()]+'</span></div>').join("")+'</div>'+
+    '<div class="small muted" style="display:flex;gap:14px"><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#D9DEE6;margin-right:5px"></i>Zakaz</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--orange);margin-right:5px"></i>Sotildi</span></div></div>';
+  // Mijozlar sotilishi
+  const rates=clients().map(c=>({c,r:sellRate(c.id)})).filter(x=>x.r!=null).sort((a,b)=>a.r-b.r);
+  h+='<div class="card"><div class="sec"><span>Mijozlar</span><span class="sub">7 kunda sotilishi</span></div>'+(rates.length?rates.map(x=>{const col=x.r>=90?"var(--ok)":x.r>=60?"var(--warn)":"var(--bad)";const cls=x.r>=90?"ok":x.r>=60?"warn":"bad";
+    return '<div class="ingrow" role="button" tabindex="0" data-act="akt" data-c="'+x.c.id+'" style="cursor:pointer;align-items:center"><div style="flex:1;min-width:0"><div class="b">'+esc(x.c.name)+'</div><div class="bar" style="margin-top:5px;max-width:170px"><i style="width:'+x.r+'%;background:'+col+'"></i></div></div><span class="pill '+cls+'">'+x.r+'%</span></div>'}).join(""):'<div class="muted">Hali yetkazish bo\'lmagan.</div>')+'</div>';
+  // Ombor
+  const st=ings().map(i=>{const a=avgDaily(i.id);const s0=+i.stock||0;return {i,days:a?Math.floor(s0/a):null,s0,low:s0<(+i.min||0)*uinfo(i).f}}).sort((a,b)=>(a.days??999)-(b.days??999)||(b.low-a.low)).slice(0,5);
+  h+='<div class="card" role="button" tabindex="0" data-act="tab" data-k="ombor" style="cursor:pointer"><div class="sec"><span>Ombor</span><span class="sub">necha kunga yetadi</span></div>'+st.map(x=>{const cls=x.s0<=0||x.low?"bad":(x.days!=null&&x.days<4)?"warn":"ok";
+    return '<div class="ingrow" style="align-items:center"><span>'+esc(x.i.name)+'</span><span class="pill '+cls+'">'+(x.days!=null?x.days+" kun · ":"")+showQty(Math.max(0,x.s0),x.i)+'</span></div>'}).join("")+'</div>';
+  return h;
+}
+function vKoproq(){
+  const it=(k,t,s)=>'<button class="row" data-act="tab" data-k="'+k+'" style="border:none;background:none;width:100%;text-align:left;border-bottom:1px solid var(--line)"><div class="col"><span class="b">'+t+'</span><span class="small muted">'+s+'</span></div><span aria-hidden="true">›</span></button>';
+  return header("Ko'proq")+'<div class="list">'+it("hisob","Hisob","Savdo, tan narx, foyda, xarajatlar, qarzlar")+it("sozlama","Sozlama","Retsept, narx, mijozlar, foydalanuvchilar")+'</div>';
 }
 
 /* BUGUN */
@@ -213,7 +296,7 @@ function moneyCard(){
   const total=rows.reduce((s,x)=>s+x.b,0);
   let h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span class="sec">Mijozlardagi pulim</span><span class="xb num" style="font-size:18px;color:var(--ink)">'+som(total)+'</span></div>';
   if(!rows.length)h+='<div class="muted">Hozircha hech kimda pulingiz yo\'q.</div>';
-  else h+=rows.map(x=>'<div class="ingrow" style="padding:7px 0"><span>'+esc(x.c.name)+'</span><span class="b num">'+som(x.b)+'</span></div>').join("");
+  else h+=rows.map(x=>'<div class="ingrow" role="button" tabindex="0" data-act="akt" data-c="'+x.c.id+'" style="padding:7px 0;cursor:pointer"><span>'+esc(x.c.name)+'</span><span class="b num">'+som(x.b)+'</span></div>').join("");
   return h+'<button class="linkbtn" data-act="tab" data-k="hisob" style="align-self:flex-start;padding:4px 0">Batafsil — Hisob bo\'limi</button></div>';
 }
 function lowList(){const out=[];for(const i of ings()){const st=+i.stock||0;const min=(+i.min||0)*uinfo(i).f;const avg=avgDaily(i.id);
@@ -273,11 +356,11 @@ function vYetkazish(){
     else{const old=s.before-(s.mode==="ertasi"?s.prevSum:0);
       h+='<div class="box"><span class="small muted">'+(s.mode==="ertasi"?"Kechagi zakaz uchun olinadi":"Bugungi zakaz uchun olinadi")+'</span><span class="xb num" style="font-size:20px">'+som(Math.max(0,s.due))+'</span>'+(old>0?'<span class="small" style="color:var(--bad)">Eski qarz: '+som(old)+'</span>':"")+'</div>'+
       '<div style="display:flex;gap:8px"><button class="btn ok" style="flex:1;min-height:52px" data-act="give" data-c="'+c.id+'">Hammasi to\'g\'ri — Berildi</button><button class="btn ghost" data-act="fix" data-c="'+c.id+'">Tuzatish</button></div>'}
-    h+='</div>'}
+    h+='<button class="linkbtn" data-act="pay" data-c="'+c.id+'" style="align-self:flex-start;padding:2px 0">Faqat qarz to\'lovi oldim</button></div>'}
   return h;
 }
 async function saveDelivery(cid,given,returned,paid){
-  const c=S.clients[cid];const d=viewDate;const s=delivState(c);
+  const c=clientOf(cid);const d=viewDate;const s=delivState(c);
   const givenSum=Object.keys(given).reduce((x,t)=>x+(+given[t]||0)*(s.priceMap[t]||cprice(c,t)),0);
   const retSum=Object.keys(returned).reduce((x,t)=>x+(+returned[t]||0)*((s.prev&&s.prev.priceMap&&s.prev.priceMap[t])||cprice(c,t)),0);
   const deliveries=Object.assign({},day(d).deliveries||{});
@@ -313,17 +396,21 @@ function vHisob(){
       for(const t in dl.given||{})perType[t]=(perType[t]||0)+(+dl.given[t]||0);for(const t in dl.returned||{})perType[t]=(perType[t]||0)-(+dl.returned[t]||0)}}
   for(const t in perType){const ty=S.types[t];if(ty)cost+=perType[t]*typeCost(ty)}
   let buy=0,home=0;for(const m of Object.values(S.moves)){if(!inPeriod(m.date))continue;if(m.kind==="xarid")buy+=m.total||0;if(m.kind==="uyga")home+=m.total||0}
-  h+='<div class="grid2">'+[["Sotildi",sp(giv-ret)+" ta"],["Savdo",som(rev)],["Tushgan pul",som(paid)],["Foyda (taxminan)",som(rev-cost)]].map(([a,b])=>'<div class="card" style="gap:2px"><span class="small muted">'+a+'</span><span class="xb num" style="font-size:18px">'+b+'</span></div>').join("")+'</div>';
-  h+='<div class="list">'+[["Zakaz",sp(zak)+" ta"],["Berildi",sp(giv)+" ta"],["Zakazdan kam berildi",sp(Math.max(0,zak-giv))+" ta"],["Qaytdi",sp(ret)+" ta"],["Somsa tan narxi",som(cost)],["Xaridlar",som(buy)],["Uyga o'tkazildi",som(home)]].map(([a,b])=>'<div class="row"><span>'+a+'</span><span class="b num">'+b+'</span></div>').join("")+'</div>';
+  const exps=Object.entries(S.expenses).map(([id,e])=>({id,...e})).filter(e=>inPeriod(e.date)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));const expSum=exps.reduce((x,e)=>x+e.amount,0);
+  for(const p of Object.values(S.payments))if(inPeriod(p.date))paid+=p.amount;
+  h+='<div class="grid2">'+[["Sotildi",sp(giv-ret)+" ta"],["Savdo",som(rev)],["Tushgan pul",som(paid)],["Foyda (taxminan)",som(rev-cost-expSum)]].map(([a,b])=>'<div class="card" style="gap:2px"><span class="small muted">'+a+'</span><span class="xb num" style="font-size:18px">'+b+'</span></div>').join("")+'</div>';
+  h+='<div class="list">'+[["Zakaz",sp(zak)+" ta"],["Berildi",sp(giv)+" ta"],["Zakazdan kam berildi",sp(Math.max(0,zak-giv))+" ta"],["Qaytdi",sp(ret)+" ta"],["Somsa tan narxi",som(cost)],["Boshqa xarajatlar",som(expSum)],["Xaridlar",som(buy)],["Uyga o'tkazildi",som(home)]].map(([a,b])=>'<div class="row"><span>'+a+'</span><span class="b num">'+b+'</span></div>').join("")+'</div>';
+  h+='<div class="sec"><span>Boshqa xarajatlar</span><button class="btn small" data-act="exp">+ Xarajat</button></div>';
+  h+=exps.length?'<div class="list">'+exps.map(e=>'<button class="row" data-act="expdel" data-id="'+e.id+'" style="border:none;background:none;text-align:left;width:100%;border-bottom:1px solid var(--line)"><div class="col"><span class="b">'+esc(e.category)+'</span><span class="small muted">'+shortDate(e.date)+(e.note?" · "+esc(e.note):"")+'</span></div><span class="b num">'+som(e.amount)+'</span></button>').join("")+'</div>':'<div class="card empty">Bu davrda xarajat kiritilmagan. Gaz, o\'tin, benzin, paket kabilarni shu yerga yozing.</div>';
   h+='<div class="sec">Tan narx</div>';
-  h+=types().map(t=>{const tc=typeCost(t);return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="xb" style="font-size:17px">'+esc(t.name)+'</span><span class="xb num" style="font-size:20px;color:var(--accent)">'+som(tc)+'</span></div>'+
+  h+=types().map(t=>{const tc=typeCost(t);return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="xb" style="font-size:17px">'+esc(t.name)+'</span><span class="xb num" style="font-size:20px;color:var(--ink)">'+som(tc)+'</span></div>'+
     (t.recipe||[]).filter(r=>S.ings[r.ing]).map(r=>{const i=S.ings[r.ing];return '<div style="display:flex;justify-content:space-between" class="small"><span class="muted">'+esc(r.label||i.name)+' '+(uinfo(i).f===1?(Math.round(r.qty*1000)/1000).toString().replace(".",",")+" ta":(Math.round(r.qty*10)/10).toString().replace(".",",")+" "+baseLabel(i))+'</span><span class="num">'+sp(r.qty*ppb(i))+'</span></div>'}).join("")+
     '<div style="display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:8px"><span>Foyda, '+sp(t.price)+' dan</span><span class="b num" style="color:var(--ok)">'+som(t.price-tc)+'</span></div></div>'}).join("");
-  h+='<div class="sec">Bizga qarzlar</div><div class="list">'+clients().map(c=>{const b=clientBalance(c.id);const st=sellRate(c.id);
-    return '<div class="row"><div class="col"><span class="b">'+esc(c.name)+'</span><span class="small muted">'+(c.payMode==="darhol"?"darhol to'laydi":"ertasi kuni to'laydi")+(st!=null?" · 7 kunda sotilishi "+st+"%":"")+'</span></div><span class="b num" style="color:'+(b>0?"var(--bad)":"var(--ink)")+'">'+som(b)+'</span></div>'}).join("")+'</div>';
+  h+='<div class="sec"><span>Bizga qarzlar</span><span class="sub">bosing — hisob-kitob varag\'i</span></div><div class="list">'+clients().map(c=>{const b=clientBalance(c.id);const st=sellRate(c.id);
+    return '<div class="row" role="button" tabindex="0" data-act="akt" data-c="'+c.id+'" style="cursor:pointer"><div class="col"><span class="b">'+esc(c.name)+'</span><span class="small muted">'+(c.payMode==="darhol"?"darhol to'laydi":"ertasi kuni to'laydi")+(st!=null?" · 7 kunda sotilishi "+st+"%":"")+'</span></div><span class="b num" style="color:'+(b>0?"var(--bad)":"var(--ink)")+'">'+som(b)+'</span></div>'}).join("")+'</div>';
   const debts=Object.entries(S.debts).map(([id,d])=>({id,...d}));const dt=debts.reduce((s,d)=>s+(+d.amount||0),0);
   h+='<div class="sec"><span>Bizning qarzlarimiz</span><button class="btn small" data-act="debt">+ Qarz</button></div>';
-  h+=debts.length?'<div class="list">'+debts.map(d=>'<div class="row"><div class="col"><span class="b">'+esc(d.name)+'</span><span class="small muted">'+esc(d.note||"")+'</span></div><div style="display:flex;gap:8px;align-items:center"><span class="b num">'+som(d.amount)+'</span><button class="btn ghost small" data-act="debtpay" data-id="'+d.id+'">To\'landi</button></div></div>').join("")+'<div class="row"><span class="b">Jami</span><span class="xb num">'+som(dt)+'</span></div></div>':'<div class="card empty">Qarzlar hali kiritilmagan.</div>';
+  h+=debts.length?'<div class="list">'+debts.map(d=>'<div class="row"><div class="col"><span class="b">'+esc(d.name)+'</span><span class="small muted">'+esc(d.note||"")+'</span></div><div style="display:flex;gap:8px;align-items:center"><span class="b num">'+som(d.amount)+'</span><button class="btn ghost small" data-act="debtpay" data-id="'+d.id+'">To\'lash</button></div></div>').join("")+'<div class="row"><span class="b">Jami</span><span class="xb num">'+som(dt)+'</span></div></div>':'<div class="card empty">Qarzlar hali kiritilmagan.</div>';
   return h;
 }
 
@@ -371,7 +458,7 @@ function mHead(t){return '<div style="display:flex;justify-content:space-between
 function stepHtml(prefix,t,v){return '<div class="stepper"><button type="button" data-step="'+prefix+'" data-t="'+t+'" data-n="-1" aria-label="Kamaytirish">−</button><span class="val num" id="'+prefix+'_'+t+'">'+v+'</span><button type="button" class="plus" data-step="'+prefix+'" data-t="'+t+'" data-n="1" aria-label="Ko\'paytirish">+</button></div>'}
 
 function mFix(cid){
-  const c=S.clients[cid];const s=delivState(c);const given=Object.assign({},s.given);const ret=Object.assign({},s.returned);
+  const c=clientOf(cid);const s=delivState(c);const given=Object.assign({},s.given);const ret=Object.assign({},s.returned);
   const retTs=s.prev?Object.keys(s.prev.given||{}).filter(t=>s.prev.given[t]>0):[];
   const calc=()=>{const gs=Object.keys(given).reduce((x,t)=>x+given[t]*(s.priceMap[t]||0),0);const rs=Object.keys(ret).reduce((x,t)=>x+(+ret[t]||0)*((s.prev&&s.prev.priceMap&&s.prev.priceMap[t])||cprice(c,t)),0);return (s.mode==="ertasi"?s.prevSum:gs)-rs};
   let h=mHead(c.name)+'<div class="card"><span class="b">Bugun berildi</span>'+s.ts.map(t=>'<div style="display:flex;justify-content:space-between;align-items:center"><span>'+esc(S.types[t].name)+' <span class="small muted">zakaz '+((s.z||{})[t]||0)+'</span></span>'+stepHtml("g",t,given[t]||0)+'</div>').join("")+'</div>';
@@ -436,8 +523,59 @@ function mDebt(){
 }
 function mDebtPay(id){
   const d=S.debts[id];if(!d)return;
-  openModal(mHead("Qarz to'landimi?")+'<div class="card"><span class="b">'+esc(d.name)+'</span><span class="xb num" style="font-size:20px">'+som(d.amount)+'</span></div><button class="btn ok wide" id="dp_yes">Ha, to\'landi — ro\'yxatdan o\'chirish</button><button class="btn ghost wide" data-act="close">Bekor qilish</button>',m=>{
-    m.querySelector("#dp_yes").addEventListener("click",async()=>{try{await run(sb.from("debts").delete().eq("id",id),"O'chirildi");closeModal()}catch(e){}})});
+  openModal(mHead("Qarzni to'lash")+'<div class="card"><span class="b">'+esc(d.name)+'</span><span class="small muted">Qolgan qarz</span><span class="xb num" style="font-size:20px">'+som(d.amount)+'</span></div><div class="field"><label for="dp_amt">To\'langan summa (so\'m)</label><input class="inp num" id="dp_amt" inputmode="numeric" value="'+Math.round(d.amount)+'"></div><div class="small muted">Qisman to\'lasangiz, qolgani ro\'yxatda qoladi. To\'liq to\'lansa, qarz ro\'yxatdan o\'chadi.</div><button class="btn wide" id="dp_yes">Saqlash</button><button class="btn ghost wide" data-act="close">Bekor qilish</button>',m=>{
+    m.querySelector("#dp_yes").addEventListener("click",async()=>{const a=num(m.querySelector("#dp_amt").value);if(!(a>0)){toast("Summani kiriting");return}
+      const left=Math.round(d.amount-a);
+      try{if(left<=0)await run(sb.from("debts").delete().eq("id",id),"Qarz to'liq to'landi");
+        else await run(sb.from("debts").update({amount:left,note:((d.note||"")+" · "+shortDate(ymd(new Date()))+": "+sp(a)+" to'landi").replace(/^ · /,"")}).eq("id",id),"Qolgan qarz: "+som(left));
+        closeModal()}catch(e){}})});
+}
+/* Mijozdan qarz to'lovi (somsa topshirilmagan kuni ham) */
+function mPay(cid){
+  const c=S.clients[cid];if(!c)return;const b=clientBalance(cid);
+  openModal(mHead("Qarz to'lovi")+'<div class="card"><span class="b">'+esc(c.name)+'</span><span class="small muted">Hozirgi qarzi</span><span class="xb num" style="font-size:20px">'+som(b)+'</span></div><div class="field"><label for="py_amt">Olingan summa (so\'m)</label><input class="inp num" id="py_amt" inputmode="numeric"></div><div class="field"><label for="py_date">Sana</label><input class="inp" type="date" id="py_date" value="'+ymd(new Date())+'"></div><div class="field"><label for="py_note">Izoh (ixtiyoriy)</label><input class="inp" id="py_note"></div><button class="btn wide" id="py_save">Saqlash</button>',m=>{
+    m.querySelector("#py_save").addEventListener("click",async()=>{const a=num(m.querySelector("#py_amt").value);if(!(a>0)){toast("Summani kiriting");return}
+      const row={client_id:cid,amount:a,date:m.querySelector("#py_date").value||ymd(new Date()),note:m.querySelector("#py_note").value.trim()};
+      row.id=(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(36).slice(2));
+      S.payments[row.id]={client:cid,date:row.date,amount:a,note:row.note};
+      try{await sendOrQueue({k:"pay",row},"To'lov saqlandi");closeModal();render()}catch(e){delete S.payments[row.id]}})});
+}
+/* Mijoz hisob-kitob varag'i (akt sverka) */
+function aktLines(cid){
+  const c=S.clients[cid]||{};const ev=[];
+  for(const k of dayKeys()){const dl=(S.days[k].deliveries||{})[cid];if(!dl||!dl.done)continue;
+    if(dl.givenSum)ev.push({date:k,o:1,txt:"Berildi: "+sumObj(dl.given)+" ta",plus:dl.givenSum});
+    if(dl.retSum)ev.push({date:k,o:0,txt:"Qaytdi: "+sumObj(dl.returned)+" ta",minus:dl.retSum});
+    if(dl.paid)ev.push({date:k,o:2,txt:"To'landi",minus:dl.paid})}
+  for(const p of Object.values(S.payments))if(p.client===cid)ev.push({date:p.date,o:3,txt:"Qarz to'lovi"+(p.note?" ("+p.note+")":""),minus:p.amount});
+  ev.sort((a,b)=>a.date.localeCompare(b.date)||a.o-b.o);
+  let bal=+c.startDebt||0;for(const e of ev){bal+=(e.plus||0)-(e.minus||0);e.bal=bal}
+  return {start:+c.startDebt||0,ev,bal};
+}
+function mAkt(cid){
+  const c=S.clients[cid];if(!c)return;const A=aktLines(cid);const show=A.ev.slice(-60).reverse();
+  let h=mHead(c.name)+'<div class="card" style="gap:2px"><span class="small muted">Hozirgi qarzi</span><span class="xb num" style="font-size:24px">'+som(A.bal)+'</span></div>';
+  h+='<div class="grid2"><button class="btn" data-act="pay" data-c="'+cid+'">To\'lov qabul qilish</button><button class="btn ghost" id="ak_share">Ulashish</button></div>';
+  h+=show.length?'<div class="list">'+show.map(e=>'<div class="row"><div class="col"><span class="b">'+esc(e.txt)+'</span><span class="small muted">'+shortDate(e.date)+' · qoldiq '+sp(e.bal)+'</span></div><span class="b num" style="color:'+(e.plus?"var(--ink)":"var(--ok)")+'">'+(e.plus?"+":"−")+sp(e.plus||e.minus)+'</span></div>').join("")+'</div>':'<div class="card empty">Hali hisob-kitob yo\'q.</div>';
+  if(A.start)h+='<div class="small muted">Boshlang\'ich qarz: '+som(A.start)+'</div>';
+  openModal(h,m=>{m.querySelector("#ak_share").addEventListener("click",()=>{
+    const lines=["HISOB-KITOB VARAG'I","Mijoz: "+c.name,"Sana: "+shortDate(ymd(new Date())),""];
+    if(A.start)lines.push("Boshlang'ich qarz: "+sp(A.start));
+    for(const e of A.ev.slice(-30))lines.push(shortDate(e.date)+" — "+e.txt+": "+(e.plus?"+":"−")+sp(e.plus||e.minus)+" (qoldiq "+sp(e.bal)+")");
+    lines.push("");lines.push("Qolgan qarz: "+som(A.bal));
+    location.href="https://t.me/share/url?url="+encodeURIComponent(" ")+"&text="+encodeURIComponent(lines.join("\n"))})});
+}
+/* Boshqa xarajatlar */
+const EXP_CATS=["Gaz","O'tin / ko'mir","Benzin","Paket","Elektr","Boshqa"];
+function mExpense(){
+  openModal(mHead("Xarajat")+'<div class="field"><label for="ex_cat">Turi</label><select class="inp" id="ex_cat">'+EXP_CATS.map(c=>'<option>'+esc(c)+'</option>').join("")+'</select></div><div class="field"><label for="ex_amt">Summa (so\'m)</label><input class="inp num" id="ex_amt" inputmode="numeric"></div><div class="field"><label for="ex_date">Sana</label><input class="inp" type="date" id="ex_date" value="'+ymd(new Date())+'"></div><div class="field"><label for="ex_note">Izoh (ixtiyoriy)</label><input class="inp" id="ex_note"></div><button class="btn wide" id="ex_save">Saqlash</button>',m=>{
+    m.querySelector("#ex_save").addEventListener("click",async()=>{const a=num(m.querySelector("#ex_amt").value);if(!(a>0)){toast("Summani kiriting");return}
+      try{await run(sb.from("expenses").insert({category:m.querySelector("#ex_cat").value,amount:a,date:m.querySelector("#ex_date").value||ymd(new Date()),note:m.querySelector("#ex_note").value.trim()}),"Xarajat saqlandi");closeModal()}catch(e){}})});
+}
+function mExpDel(id){
+  const e=S.expenses[id];if(!e)return;
+  openModal(mHead("Xarajat")+'<div class="card"><span class="b">'+esc(e.category)+' · '+som(e.amount)+'</span><span class="small muted">'+shortDate(e.date)+(e.note?" · "+esc(e.note):"")+'</span></div><button class="btn danger wide" id="xd_yes">Bu xarajatni o\'chirish</button><button class="btn ghost wide" data-act="close">Yopish</button>',m=>{
+    m.querySelector("#xd_yes").addEventListener("click",async()=>{try{await run(sb.from("expenses").delete().eq("id",id),"O'chirildi");closeModal()}catch(err){}})});
 }
 function slug(s){return (String(s).toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")||"x")+"_"+Math.random().toString(36).slice(2,6)}
 function mType(id){
@@ -499,12 +637,14 @@ document.addEventListener("click",e=>{
   else if(a==="seltype"){selType=b.dataset.t;render()}
   else if(a==="ord")changeOrder(viewDate,b.dataset.c,b.dataset.t,+b.dataset.n);
   else if(a==="ret"){const d=drafts[b.dataset.c]=drafts[b.dataset.c]||{};d[b.dataset.t]=Math.max(0,(+d[b.dataset.t]||0)+(+b.dataset.n));render()}
-  else if(a==="give"){const c=S.clients[b.dataset.c];const s=delivState(c);saveDelivery(c.id,s.given,s.returned,Math.max(0,s.due))}
+  else if(a==="give"){const c=clientOf(b.dataset.c);if(!c)return;const s=delivState(c);saveDelivery(c.id,s.given,s.returned,Math.max(0,s.due))}
   else if(a==="fix")mFix(b.dataset.c);
   else if(a==="nak")mNak(b.dataset.c);
   else if(a==="xarid")mXarid();else if(a==="uyga")mUyga();else if(a==="sanash")mSanash();
   else if(a==="period"){period=b.dataset.k;render()}
   else if(a==="debt")mDebt();else if(a==="debtpay")mDebtPay(b.dataset.id);
+  else if(a==="pay")mPay(b.dataset.c);else if(a==="akt")mAkt(b.dataset.c);
+  else if(a==="exp")mExpense();else if(a==="expdel")mExpDel(b.dataset.id);
   else if(a==="zax"){const v=Object.assign({},S.config,{zaxira:Math.max(0,(+S.config.zaxira||0)+(+b.dataset.n))});S.config=v;render();run(sb.from("settings").upsert({key:"main",value:v}))}
   else if(a==="edtype")mType(b.dataset.id);else if(a==="edclient")mClient(b.dataset.id);else if(a==="eding")mIng(b.dataset.id);
   else if(a==="history")mHistory();
@@ -512,7 +652,7 @@ document.addEventListener("click",e=>{
 });
 document.getElementById("modalwrap").addEventListener("click",e=>{if(e.target.id==="modalwrap")closeModal()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")window.somsaBack()});
-async function refresh(){if(!session||!ready)return;await loadAll();if(role()==="kuzatuvchi")await fetchKuzatuv(viewDate);else render()}
+async function refresh(){if(!session||!ready)return;try{await loadAll();applyQueued();saveCache()}catch(e){return}if(role()==="kuzatuvchi")await fetchKuzatuv(viewDate);else render()}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refresh()});
 // Kuzatuvchi jonli yangilanishni olmaydi: har daqiqada yangilab turamiz
 setInterval(()=>{if(document.visibilityState==="visible"&&session&&ready&&role()==="kuzatuvchi")fetchKuzatuv(viewDate)},60000);
@@ -522,8 +662,10 @@ async function start(sess){
   session=sess;ready=false;
   if(!session){if(channel){sb.removeChannel(channel);channel=null}render();return}
   splash("Ma'lumotlar yuklanmoqda…");
-  try{await loadAll()}catch(e){splash("Ma'lumotlarni yuklab bo'lmadi. Internetni tekshirib, dasturni qayta oching.");return}
-  ready=true;subscribe();render();
+  try{await loadAll();applyQueued();saveCache()}
+  catch(e){if(loadCache()){applyQueued();ready=true;render();toast("Internet yo'q — oxirgi saqlangan ma'lumotlar ko'rsatilmoqda");return}
+    splash("Ma'lumotlarni yuklab bo'lmadi. Internetni tekshirib, dasturni qayta oching.");return}
+  ready=true;subscribe();render();flushQueue();
 }
 let lastUser=undefined;
 sb.auth.onAuthStateChange((_ev,sess)=>{const uid=sess?sess.user.id:null;if(uid===lastUser){session=sess;return}lastUser=uid;setTimeout(()=>start(sess),0)});
