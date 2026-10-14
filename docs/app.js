@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=4';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=5';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "4";
+const APP_V = "5";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -189,6 +189,7 @@ function vBugun(){
   h+='<div class="hero pat"><div class="lbl">Yopiladi</div><div style="display:flex;align-items:baseline;gap:8px"><span class="big num">'+all+'</span><span class="unit">ta somsa</span></div><div class="grid3">'+
     ty.map(t=>'<button class="tile '+(selType===t.id?"on":"")+'" data-act="seltype" data-t="'+t.id+'" aria-pressed="'+(selType===t.id)+'"><span class="t">'+esc(t.name)+'</span><span class="n num">'+(tot[t.id]||0)+'</span></button>').join("")+
     '</div><div class="hint">Turini bosing — masalliqlari chiqadi</div></div>';
+  if(role()==="admin")h+=moneyCard();
   const t=S.types[selType];const n=tot[selType]||0;const shown=(t.recipe||[]).filter(r=>r.show&&S.ings[r.ing]);
   h+='<div class="card"><div class="sec"><span>'+esc(t.name)+' — '+n+' ta</span></div>';
   if(!shown.length)h+='<div class="muted">Bu tur uchun ko\'rsatiladigan masalliq hali kiritilmagan.</div>';
@@ -205,6 +206,15 @@ function vBugun(){
     ts.map(tid=>'<div style="display:flex;justify-content:space-between;align-items:center"><span>'+esc(S.types[tid].name)+'</span><div class="stepper"><button data-act="ord" data-c="'+c.id+'" data-t="'+tid+'" data-n="-1" aria-label="Kamaytirish">−</button><span class="val num">'+((o[c.id]||{})[tid]||0)+'</span><button class="plus" data-act="ord" data-c="'+c.id+'" data-t="'+tid+'" data-n="1" aria-label="Ko\'paytirish">+</button><button data-act="ord" data-c="'+c.id+'" data-t="'+tid+'" data-n="5" aria-label="5 ta qo\'shish" style="font-size:13px;width:44px">+5</button></div></div>').join("")+'</div>'}).join("")+'</div>';
   h+='<button class="linkbtn" data-act="logout">Hisobdan chiqish</button>';
   return h;
+}
+/* Mijozlardagi pul: har bir do'konning hozirgi qarzi va jami (faqat admin) */
+function moneyCard(){
+  const rows=clients().map(c=>({c,b:clientBalance(c.id)})).filter(x=>Math.abs(x.b)>=1).sort((a,b)=>b.b-a.b);
+  const total=rows.reduce((s,x)=>s+x.b,0);
+  let h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span class="h1" style="font-size:20px">Mijozlardagi pulim</span><span class="xb num" style="font-size:24px;color:var(--ink)">'+som(total)+'</span></div>';
+  if(!rows.length)h+='<div class="muted">Hozircha hech kimda pulingiz yo\'q.</div>';
+  else h+=rows.map(x=>'<div class="ingrow" style="padding:7px 0"><span>'+esc(x.c.name)+'</span><span class="b num">'+som(x.b)+'</span></div>').join("");
+  return h+'<button class="linkbtn" data-act="tab" data-k="hisob" style="align-self:flex-start;padding:4px 0">Batafsil — Hisob bo\'limi</button></div>';
 }
 function lowList(){const out=[];for(const i of ings()){const st=+i.stock||0;const min=(+i.min||0)*uinfo(i).f;const avg=avgDaily(i.id);
   if(st<=0)out.push({name:i.name,out:true,txt:"tugagan"});else if(st<min)out.push({name:i.name,txt:showQty(st,i)+(avg?" (~"+Math.max(0,Math.floor(st/avg))+" kunga)":"")})}return out}
