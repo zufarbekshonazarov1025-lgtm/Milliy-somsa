@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=10';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=11';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "10";
+const APP_V = "11";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -714,16 +714,32 @@ function mSanash(){
 /* Tayyorlash: xom ashyodan yarim tayyor mahsulot qilish (masalan marinovka) */
 function mTayyor(){
   const list=semis();if(!list.length){toast("Avval Kalkulyatsiyada yarim tayyor mahsulot qo'shing");return}
-  openModal(mHead("Tayyorlash")+'<div class="field"><label for="ty_semi">Nima tayyorlandi</label><select class="inp" id="ty_semi">'+list.map(sm=>'<option value="'+sm.id+'">'+esc(sm.name)+'</option>').join("")+'</select></div><div class="field"><label for="ty_q">Qancha chiqdi</label><div class="inrow"><input class="inp num" id="ty_q" inputmode="decimal"><span class="tag">kg</span></div></div><div class="card" id="ty_use" style="gap:4px"></div><div class="err" id="ty_err" style="color:var(--bad)"></div><button class="btn wide" id="ty_save">Saqlash</button>',m=>{
-    const sel=m.querySelector("#ty_semi"),q=m.querySelector("#ty_q");
-    const calc=()=>{const sm=S.semi[sel.value];const out=(num(q.value)||0)*1000;const use=[];if(sm&&sm.yield)for(const r of sm.recipe||[]){const i=S.ings[r.ing];if(i)use.push({i,id:r.ing,qty:r.qty*out/sm.yield})}return {sm,out,use}};
-    const upd=()=>{const {sm,out,use}=calc();if(!q.value){q.placeholder=sm?String(sm.yield/1000).replace(".",","):""}
-      m.querySelector("#ty_use").innerHTML='<span class="small muted">Ombordan ayiriladi:</span>'+(out?use.map(u=>'<div class="ingrow" style="padding:4px 0"><span>'+esc(u.i.name)+'</span><span class="b num">'+showQty(u.qty,u.i)+'</span></div>').join(""):'<span class="small muted">Miqdorni yozing</span>')};
-    sel.addEventListener("change",upd);q.addEventListener("input",upd);upd();
-    m.querySelector("#ty_save").addEventListener("click",async()=>{const {sm,out,use}=calc();if(!(out>0)){m.querySelector("#ty_err").textContent="Qancha chiqqanini yozing";return}
+  openModal(mHead("Tayyorlash")+'<div class="field"><label for="ty_semi">Nima tayyorlandi</label><select class="inp" id="ty_semi">'+list.map(sm=>'<option value="'+sm.id+'">'+esc(sm.name)+'</option>').join("")+'</select></div>'+
+    '<div class="field"><label for="ty_in" id="ty_in_l">Qancha solindi</label><div class="inrow"><input class="inp num" id="ty_in" inputmode="decimal"><span class="tag" id="ty_in_u"></span></div></div>'+
+    '<div class="field"><label for="ty_q">Qancha chiqdi</label><div class="inrow"><input class="inp num" id="ty_q" inputmode="decimal"><span class="tag">kg</span></div></div>'+
+    '<div class="card" id="ty_use" style="gap:4px"></div><label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ty_upd"> Kalkulyatsiyadagi chiqishni shu bo\'yicha yangilash</label>'+
+    '<div class="err" id="ty_err" style="color:var(--bad)"></div><button class="btn wide" id="ty_save">Saqlash</button>',m=>{
+    const sel=m.querySelector("#ty_semi"),inp=m.querySelector("#ty_in"),q=m.querySelector("#ty_q");
+    // Asosiy masalliq — retseptdagi eng ko'p miqdorli qator (masalan go'sht yoki un)
+    const mainRow=sm=>(sm.recipe||[]).filter(r=>S.ings[r.ing]).sort((a,b)=>b.qty-a.qty)[0];
+    const calc=()=>{const sm=S.semi[sel.value];const mr=sm&&mainRow(sm);const out=(num(q.value)||0)*1000;
+      if(!sm||!mr)return {sm,mr,out,use:[],k:0};
+      const i=S.ings[mr.ing];const inBase=(num(inp.value)||0)*uinfo(i).f;const k=inBase/mr.qty;
+      const use=(sm.recipe||[]).map(r=>({i:S.ings[r.ing],id:r.ing,qty:r.qty*k})).filter(u=>u.i);
+      return {sm,mr,out,use,k}};
+    const upd=()=>{const {sm,mr,out,use,k}=calc();
+      if(mr){const i=S.ings[mr.ing];m.querySelector("#ty_in_l").textContent="Qancha "+i.name.toLowerCase()+" solindi";m.querySelector("#ty_in_u").textContent=uinfo(i).name}
+      const ratio=k>0&&out>0?out/(sm.yield*k):0;
+      m.querySelector("#ty_use").innerHTML='<span class="small muted">Ombordan ayiriladi:</span>'+(k>0?use.map(u=>'<div class="ingrow" style="padding:4px 0"><span>'+esc(u.i.name)+'</span><span class="b num">'+showQty(u.qty,u.i)+'</span></div>').join(""):'<span class="small muted">Qancha solinganini yozing</span>')+
+        (ratio?'<div class="small muted" style="margin-top:4px">Retsept bo\'yicha '+showQty(sm.yield*k,{unit:"kg"})+' chiqishi kerak edi, '+showQty(out,{unit:"kg"})+' chiqdi ('+Math.round(ratio*100)+'%).</div>':"")};
+    sel.addEventListener("change",upd);inp.addEventListener("input",upd);q.addEventListener("input",upd);upd();
+    m.querySelector("#ty_save").addEventListener("click",async()=>{const {sm,out,use,k}=calc();const err=m.querySelector("#ty_err");
+      if(!(k>0)){err.textContent="Qancha solinganini yozing";return}if(!(out>0)){err.textContent="Qancha chiqqanini yozing";return}
       const changes={["s:"+sel.value]:out};for(const u of use)changes[u.id]=(changes[u.id]||0)-u.qty;
       const items=[{ing:"s:"+sel.value,qty:out,made:true}].concat(use.map(u=>({ing:u.id,qty:u.qty})));
-      try{await run(sb.rpc("adjust_stock",{changes}));await run(sb.from("moves").insert({kind:"tayyor",date:ymd(new Date()),items,total:0}),sm.name+" omborga qo'shildi");closeModal()}catch(e){}})});
+      try{await run(sb.rpc("adjust_stock",{changes}));await run(sb.from("moves").insert({kind:"tayyor",date:ymd(new Date()),items,total:0}));
+        if(m.querySelector("#ty_upd").checked){const ny=Math.round(out/k);await run(sb.from("semi").update({yield:ny}).eq("id",sel.value))}
+        toast(sm.name+": "+showQty(out,{unit:"kg"})+" omborga qo'shildi");closeModal()}catch(e){}})});
 }
 function mSemi(id){
   const sm=id?JSON.parse(JSON.stringify(S.semi[id])):{name:"",recipe:[],yield:1000,show:true,min:0,order:semis().length+1};
