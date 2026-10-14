@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=5';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=6';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "5";
+const APP_V = "6";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -142,7 +142,7 @@ function splash(msg){
 }
 function renderBrandbar(){
   const sw=isAdmin()?'<button class="mswitch '+(preview?"on":"")+'" data-act="mother" aria-label="Ko\'rinishni almashtirish">Ko\'rinish: '+ROLE_NAMES[role()]+'</button>':"";
-  document.getElementById("brandbar").innerHTML=lockupH(36)+sw;
+  document.getElementById("brandbar").innerHTML=lockupH(28,'#162538')+sw;
 }
 function render(){
   const main=document.getElementById("main");
@@ -211,7 +211,7 @@ function vBugun(){
 function moneyCard(){
   const rows=clients().map(c=>({c,b:clientBalance(c.id)})).filter(x=>Math.abs(x.b)>=1).sort((a,b)=>b.b-a.b);
   const total=rows.reduce((s,x)=>s+x.b,0);
-  let h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span class="h1" style="font-size:20px">Mijozlardagi pulim</span><span class="xb num" style="font-size:24px;color:var(--ink)">'+som(total)+'</span></div>';
+  let h='<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span class="sec">Mijozlardagi pulim</span><span class="xb num" style="font-size:18px;color:var(--ink)">'+som(total)+'</span></div>';
   if(!rows.length)h+='<div class="muted">Hozircha hech kimda pulingiz yo\'q.</div>';
   else h+=rows.map(x=>'<div class="ingrow" style="padding:7px 0"><span>'+esc(x.c.name)+'</span><span class="b num">'+som(x.b)+'</span></div>').join("");
   return h+'<button class="linkbtn" data-act="tab" data-k="hisob" style="align-self:flex-start;padding:4px 0">Batafsil — Hisob bo\'limi</button></div>';
