@@ -1,4 +1,6 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=3';
+document.documentElement.style.setProperty('--pattern', patternUrl());
 
 const SUPABASE_URL = 'https://xxddllenrcflwjjejqvo.supabase.co';
 // Ochiq (publishable) kalit: brauzerda turishi uchun mo'ljallangan, ma'lumotni RLS himoya qiladi.
@@ -117,10 +119,24 @@ function changeOrder(d,cid,tid,delta){
 }
 
 /* ---------- render ---------- */
+function showView(v){
+  document.getElementById("splash").hidden=v!=="splash";
+  document.getElementById("loginview").hidden=v!=="login";
+  document.getElementById("appview").hidden=v!=="app";
+}
+function splash(msg){
+  showView("splash");
+  document.getElementById("splash").innerHTML=markSvg(88)+'<div>'+esc(msg)+'</div>';
+}
+function renderBrandbar(){
+  const sw=isAdmin()?'<button class="mswitch '+(preview?"on":"")+'" data-act="mother" aria-label="Ko\'rinishni almashtirish">Ko\'rinish: '+ROLE_NAMES[role()]+'</button>':"";
+  document.getElementById("brandbar").innerHTML=lockupH(36)+sw;
+}
 function render(){
   const main=document.getElementById("main");
   if(!session){renderLogin();return}
   if(!ready)return;
+  showView("app");renderBrandbar();
   if(role()==="kuzatuvchi"){
     document.getElementById("nav").hidden=true;
     if(K.date!==viewDate&&!K.loading){fetchKuzatuv(viewDate)}
@@ -136,16 +152,15 @@ function render(){
   const y=window.scrollY;main.innerHTML=fn();window.scrollTo(0,y);
 }
 function renderLogin(){
-  document.getElementById("nav").hidden=true;
-  document.getElementById("main").innerHTML='<form class="login" id="loginForm"><div class="logo"><img src="icon.svg" width="64" height="64" alt=""></div><div class="h1">Milliy somsa</div><div class="sub">Hisobingizga kiring</div><div class="field"><label for="lg_email">Login</label><input class="inp" id="lg_email" autocapitalize="none" autocomplete="username" required></div><div class="field"><label for="lg_pass">Parol</label><input class="inp" id="lg_pass" type="password" autocomplete="current-password" required></div><div class="err" id="lg_err"></div><button class="btn wide" type="submit" style="min-height:52px">Kirish</button></form>';
+  showView("login");
+  document.getElementById("loginview").innerHTML='<form class="login" id="loginForm"><div class="brand">'+markSvg(128)+wordmarkV(230)+'</div><div class="field"><label for="lg_email">Login</label><input class="inp" id="lg_email" autocapitalize="none" autocomplete="username" placeholder="masalan: onam" required></div><div class="field"><label for="lg_pass">Parol</label><input class="inp" id="lg_pass" type="password" autocomplete="current-password" required></div><div class="err" id="lg_err" role="alert"></div><button class="btn wide" type="submit">Kirish</button></form>';
   document.getElementById("loginForm").addEventListener("submit",async e=>{e.preventDefault();const err=document.getElementById("lg_err");err.textContent="";
     let login=document.getElementById("lg_email").value.trim().toLowerCase();if(!login.includes("@"))login+="@"+LOGIN_DOMAIN;
     const {error}=await sb.auth.signInWithPassword({email:login,password:document.getElementById("lg_pass").value});
     if(error)err.textContent=error.message.includes("Invalid")?"Login yoki parol noto'g'ri":"Kirib bo'lmadi: "+error.message});
 }
 function header(title,sub){
-  const sw=isAdmin()?'<button class="mswitch '+(preview?"on":"")+'" data-act="mother" aria-label="Ko\'rinishni almashtirish">Ko\'rinish: '+ROLE_NAMES[role()]+'</button>':"";
-  return '<div class="top"><div class="col"><div class="sub">'+esc(sub||"")+'</div><div class="h1">'+esc(title)+'</div></div>'+sw+'</div>';
+  return '<div class="top"><div class="col"><div class="h1">'+esc(title)+'</div>'+(sub?'<div class="sub">'+esc(sub)+'</div>':"")+'</div></div>';
 }
 function dateBar(){
   const t=ymd(new Date());const lab=viewDate===t?"Bugun":viewDate===addDays(t,1)?"Ertaga":viewDate===addDays(t,-1)?"Kecha":"";
@@ -156,12 +171,12 @@ function dateBar(){
 /* BUGUN */
 function vBugun(){
   const ty=types();const tot=dayTypeTotals(viewDate);const all=sumObj(tot);
-  if(!ty.length)return header("Bugun",niceDate(viewDate))+'<div class="card empty"><b>Somsa turlari hali kiritilmagan</b><span>Sozlama bo\'limida turlar va retseptlarni qo\'shing.</span></div>';
+  if(!ty.length)return header("Bugun")+'<div class="card empty"><b>Somsa turlari hali kiritilmagan</b><span>Sozlama bo\'limida turlar va retseptlarni qo\'shing.</span></div>';
   if(!selType||!S.types[selType])selType=(ty.find(t=>tot[t.id])||ty[0]).id;
-  let h=header("Bugun",niceDate(ymd(new Date())))+dateBar();
-  h+='<div class="hero"><div class="lbl">Yopiladi</div><div style="display:flex;align-items:baseline;gap:8px"><span class="big num">'+all+'</span><span class="b" style="font-size:18px">ta somsa</span></div><div class="grid3">'+
+  let h=dateBar();
+  h+='<div class="hero pat"><div class="lbl">Yopiladi</div><div style="display:flex;align-items:baseline;gap:8px"><span class="big num">'+all+'</span><span class="unit">ta somsa</span></div><div class="grid3">'+
     ty.map(t=>'<button class="tile '+(selType===t.id?"on":"")+'" data-act="seltype" data-t="'+t.id+'" aria-pressed="'+(selType===t.id)+'"><span class="t">'+esc(t.name)+'</span><span class="n num">'+(tot[t.id]||0)+'</span></button>').join("")+
-    '</div><div class="small" style="opacity:.9">Turini bosing — masalliqlari chiqadi</div></div>';
+    '</div><div class="hint">Turini bosing — masalliqlari chiqadi</div></div>';
   const t=S.types[selType];const n=tot[selType]||0;const shown=(t.recipe||[]).filter(r=>r.show&&S.ings[r.ing]);
   h+='<div class="card"><div class="sec"><span>'+esc(t.name)+' — '+n+' ta</span></div>';
   if(!shown.length)h+='<div class="muted">Bu tur uchun ko\'rsatiladigan masalliq hali kiritilmagan.</div>';
@@ -184,14 +199,14 @@ function lowList(){const out=[];for(const i of ings()){const st=+i.stock||0;cons
 
 /* KUZATUVCHI: faqat sonlar va masalliq, pulsiz */
 function vKuzatuv(){
-  let h=header("Milliy somsa",niceDate(ymd(new Date())))+dateBar();
+  let h=dateBar();
   const D=K.date===viewDate?K.data:null;
   if(!D)return h+'<div class="card empty">Yuklanmoqda…</div>';
   const tys=D.types||[],cls=D.clients||[];const tot={};
   for(const c of cls)for(const t in c.orders||{})tot[t]=(tot[t]||0)+(+c.orders[t]||0);
   const all=sumObj(tot);
   if(!selType||!tys.some(t=>t.id===selType))selType=((tys.find(t=>tot[t.id])||tys[0])||{}).id;
-  h+='<div class="hero"><div class="lbl">Yopiladi</div><div style="display:flex;align-items:baseline;gap:8px"><span class="big num">'+all+'</span><span class="b" style="font-size:18px">ta somsa</span></div><div class="grid3">'+
+  h+='<div class="hero pat"><div class="lbl">Yopiladi</div><div style="display:flex;align-items:baseline;gap:8px"><span class="big num">'+all+'</span><span class="unit">ta somsa</span></div><div class="grid3">'+
     tys.map(t=>'<button class="tile '+(selType===t.id?"on":"")+'" data-act="seltype" data-t="'+esc(t.id)+'" aria-pressed="'+(selType===t.id)+'"><span class="t">'+esc(t.name)+'</span><span class="n num">'+(tot[t.id]||0)+'</span></button>').join("")+'</div></div>';
   const t=tys.find(x=>x.id===selType);
   if(t){const n=tot[t.id]||0;h+='<div class="card"><div class="sec"><span>'+esc(t.name)+' — '+n+' ta</span></div>'+
@@ -484,8 +499,8 @@ setInterval(()=>{if(document.visibilityState==="visible"&&session&&ready&&role()
 async function start(sess){
   session=sess;ready=false;
   if(!session){if(channel){sb.removeChannel(channel);channel=null}render();return}
-  document.getElementById("main").innerHTML='<div class="empty" style="padding-top:80px"><div class="h1">Milliy somsa</div><div>Ma\'lumotlar yuklanmoqda…</div></div>';
-  try{await loadAll()}catch(e){document.getElementById("main").innerHTML='<div class="card empty" style="margin-top:60px"><b>Ma\'lumotlarni yuklab bo\'lmadi</b><span>Internetni tekshirib, dasturni qayta oching.</span></div>';return}
+  splash("Ma'lumotlar yuklanmoqda…");
+  try{await loadAll()}catch(e){splash("Ma'lumotlarni yuklab bo'lmadi. Internetni tekshirib, dasturni qayta oching.");return}
   ready=true;subscribe();render();
 }
 let lastUser=undefined;
