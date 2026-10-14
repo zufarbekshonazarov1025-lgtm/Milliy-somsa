@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=11';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=12';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "11";
+const APP_V = "12";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -186,6 +186,11 @@ async function saveOrders(d){
   }catch(e){}
 }
 function queueOrders(){clearTimeout(orderTimer);orderTimer=setTimeout(()=>{for(const d of Object.keys(pendingOrders))saveOrders(d)},800)}
+function clearOrders(d){
+  const all=Object.values(ordersOf(d)).reduce((a,x)=>a+sumObj(x),0);if(!all)return;
+  openModal(mHead("Zakazlar 0 qilinsinmi?")+'<div class="card"><span class="b">'+esc(niceDate(d))+' — '+all+' ta somsa</span><span class="small muted">Shu kundagi barcha do\'konlar zakazi 0 bo\'ladi. Yetkazilgan somsa va pullar o\'zgarmaydi.</span></div><button class="btn danger wide" id="oc_yes">Ha, hammasini 0 qilish</button><button class="btn ghost wide" data-act="close">Bekor qilish</button>',m=>{
+    m.querySelector("#oc_yes").addEventListener("click",()=>{pendingOrders[d]={};closeModal();render();clearTimeout(orderTimer);saveOrders(d).then(()=>toast("Zakazlar 0 qilindi"))})});
+}
 function changeOrder(d,cid,tid,delta){
   const o=JSON.parse(JSON.stringify(ordersOf(d)));o[cid]=o[cid]||{};o[cid][tid]=Math.max(0,(+o[cid][tid]||0)+delta);
   pendingOrders[d]=o;render();queueOrders();
@@ -488,7 +493,9 @@ function vBugun(){
   h+='</div>';
   if(!isMother()){const low=lowList();if(low.length)h+='<div class="alert '+(low.some(x=>x.out)?"bad":"")+'"><b>Masalliq kam qoldi</b><span>'+low.map(x=>esc(x.name)+": "+x.txt).join(" · ")+'</span></div>'}
   const cl=clients();const o=ordersOf(viewDate);
+  const oAll=Object.values(o).reduce((a,x)=>a+sumObj(x),0);
   h+='<div class="sec"><span>Zakazlar</span><span class="sub">'+(pendingOrders[viewDate]?"saqlanmoqda…":"saqlangan")+'</span></div>';
+  if(oAll>0)h+='<button class="btn ghost wide" data-act="ordclear" style="min-height:44px">Hammasini 0 qilish</button>';
   if(!cl.length)h+='<div class="card empty">Mijozlar hali kiritilmagan.</div>';
   else h+='<div class="list">'+cl.map(c=>{const ts=(c.types||[]).filter(x=>S.types[x]);const prev=prevDelivery(c.id,viewDate);
     let hint="";if(prev){const rr=nextReturned(c.id,prev.date);hint=shortDate(prev.date)+": "+sumObj(prev.given)+" ta berilgan"+(rr!==false?", "+sumObj(rr)+" qaytgan":"")}
@@ -883,6 +890,7 @@ document.addEventListener("click",e=>{
   else if(a==="user")mUser(b.dataset.id);
   else if(a==="date"){viewDate=addDays(viewDate,+b.dataset.n);render()}
   else if(a==="seltype"){selType=b.dataset.t;render()}
+  else if(a==="ordclear")clearOrders(viewDate);
   else if(a==="ord")changeOrder(viewDate,b.dataset.c,b.dataset.t,+b.dataset.n);
   else if(a==="ret"){const d=drafts[b.dataset.c]=drafts[b.dataset.c]||{};d[b.dataset.t]=Math.max(0,(+d[b.dataset.t]||0)+(+b.dataset.n));render()}
   else if(a==="give"){const c=clientOf(b.dataset.c);if(!c)return;const s=delivState(c);saveDelivery(c.id,s.given,s.returned,Math.max(0,s.due))}
@@ -901,7 +909,11 @@ document.addEventListener("click",e=>{
 document.getElementById("modalwrap").addEventListener("click",e=>{if(e.target.id==="modalwrap")closeModal()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")window.somsaBack();else if((e.key==="Enter"||e.key===" ")&&e.target.matches&&e.target.matches('[role="button"][data-act]')){e.preventDefault();e.target.click()}});
 document.addEventListener("change",e=>{const el=e.target.closest&&e.target.closest("[data-calc]");if(!el)return;calcCounts[el.dataset.calc]=Math.max(0,parseInt(el.value,10)||0);render()});
-async function refresh(){if(!session||!ready)return;try{await loadAll();applyQueued();saveCache()}catch(e){return}if(role()==="kuzatuvchi")await fetchKuzatuv(viewDate);else render()}
+// Dastur ochiq qolib, yangi kun boshlansa: "Bugun"ni ko'rib turgan bo'lsa, yangi kunga (0 zakazli) o'tadi
+let lastToday=ymd(new Date());
+function rollDay(){const t=ymd(new Date());if(t===lastToday)return false;const was=viewDate===lastToday;lastToday=t;if(was){viewDate=t;K.date=null;return true}return false}
+setInterval(()=>{if(rollDay()&&session&&ready){if(role()==="kuzatuvchi")fetchKuzatuv(viewDate);else render()}},60000);
+async function refresh(){rollDay();if(!session||!ready)return;try{await loadAll();applyQueued();saveCache()}catch(e){return}if(role()==="kuzatuvchi")await fetchKuzatuv(viewDate);else render()}
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refresh()});
 // Kuzatuvchi jonli yangilanishni olmaydi: har daqiqada yangilab turamiz
 setInterval(()=>{if(document.visibilityState==="visible"&&session&&ready&&role()==="kuzatuvchi")fetchKuzatuv(viewDate)},60000);
