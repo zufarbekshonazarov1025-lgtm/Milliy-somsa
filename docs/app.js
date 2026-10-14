@@ -1,6 +1,18 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=3';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=4';
 document.documentElement.style.setProperty('--pattern', patternUrl());
+
+// Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
+// Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
+const APP_V = "4";
+async function checkVersion(){
+  try{
+    const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
+    if(v&&v!==APP_V){const u=new URL(location.href);if(u.searchParams.get("v")!==v){u.searchParams.set("v",v);location.replace(u.toString())}}
+  }catch(e){}
+}
+checkVersion();
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")checkVersion()});
 
 const SUPABASE_URL = 'https://xxddllenrcflwjjejqvo.supabase.co';
 // Ochiq (publishable) kalit: brauzerda turishi uchun mo'ljallangan, ma'lumotni RLS himoya qiladi.
