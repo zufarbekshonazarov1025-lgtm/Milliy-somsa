@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=8';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=9';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "8";
+const APP_V = "9";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -23,7 +23,8 @@ const MONTHS = ["yanvar","fevral","mart","aprel","may","iyun","iyul","avgust","s
 const WDAYS = ["Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba"];
 const UNITS = { kg:{base:"g",f:1000,name:"kg"}, l:{base:"ml",f:1000,name:"l"}, ta:{base:"ta",f:1,name:"ta"} };
 const ICONS = {
-  kalk:'<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01"/>',
+  kalk:'<path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/><path d="M10 12h6M10 16h6"/>',
+  kalkulyator:'<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01"/>',
   kassa:'<rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 10h.01M18 15h.01"/>',
   qarzlar:'<path d="M17 3l4 4-4 4"/><path d="M21 7H9"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h12"/>',
   menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
@@ -35,7 +36,7 @@ const ICONS = {
   hisob:'<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M21 20H3"/>',
   sozlama:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'
 };
-const TAB_NAMES = { kalk:"Kalkulyatsiya", kassa:"Hisob-kitob", qarzlar:"Qarzlar", dashboard:"Dashboard", koproq:"Ko'proq", bugun:"Bugun", yetkazish:"Yetkazish", ombor:"Ombor", hisob:"Hisob", sozlama:"Sozlama" };
+const TAB_NAMES = { kalk:"Kalkulyatsiya", kalkulyator:"Kalkulyator", kassa:"Hisob-kitob", qarzlar:"Qarzlar", dashboard:"Dashboard", koproq:"Ko'proq", bugun:"Bugun", yetkazish:"Yetkazish", ombor:"Ombor", hisob:"Hisob", sozlama:"Sozlama" };
 
 const S = { types:{}, ings:{}, clients:{}, days:{}, moves:{}, debts:{}, payments:{}, expenses:{}, cashIn:{}, cred:{}, kassa:{}, config:{zaxira:2}, profiles:{} };
 const LOGIN_DOMAIN = "milliysomsa.uz";
@@ -203,7 +204,7 @@ function render(){
     if(K.date!==viewDate&&!K.loading){fetchKuzatuv(viewDate)}
     main.innerHTML=vKuzatuv();return;
   }
-  const VIEWS={dashboard:vDashboard,koproq:vKoproq,bugun:vBugun,yetkazish:vYetkazish,ombor:vOmbor,hisob:vHisob,sozlama:vSozlama,kalk:vKalk,kassa:vKassa,qarzlar:vQarzlar};
+  const VIEWS={dashboard:vDashboard,koproq:vKoproq,bugun:vBugun,yetkazish:vYetkazish,ombor:vOmbor,hisob:vHisob,sozlama:vSozlama,kalk:vKalk,kalkulyator:vKalkulyator,kassa:vKassa,qarzlar:vQarzlar};
   if(!isMother()){
     if(!VIEWS[tab]||tab==="koproq")tab="dashboard";
     document.getElementById("nav").hidden=true;
@@ -280,7 +281,8 @@ const MENU = [
   ["bugun","Bugun","Zakaz va masalliq"],
   ["yetkazish","Yetkazish","Do'konlarga berish, to'lovlar"],
   ["ombor","Ombor","Xarid, qoldiq, sanash"],
-  ["kalk","Kalkulyatsiya","Retsept, tannarx, hisoblagich"],
+  ["kalk","Kalkulyatsiya","Har bir somsaning retsepti"],
+  ["kalkulyator","Kalkulyator","Nechta somsaga nima kerak"],
   ["kassa","Hisob-kitob","Kassa: kirim va rasxod"],
   ["qarzlar","Qarzlar","Bizga va bizning qarzlar"],
   ["hisob","Hisobot","Savdo, sotuv, davr bo'yicha"],
@@ -302,21 +304,32 @@ function backBar(){return role()==="admin"&&tab!=="dashboard"?'<button class="li
 /* ---------- KALKULYATSIYA ---------- */
 const calcCounts={};
 function vKalk(){
-  let h=backBar()+header("Kalkulyatsiya","Har bir somsa turining retsepti va tannarxi");
+  let h=backBar()+header("Kalkulyatsiya","1 ta somsaga ketadigan masalliqlar. Bir marta yoziladi, retsept o'zgarsa shu yerda o'zgartiriladi.");
   const ty=types();
-  // Hisoblagich
-  const need={};let costSum=0,cnt=0;
-  for(const t of ty){const n=+calcCounts[t.id]||0;if(!n)continue;cnt+=n;for(const r of t.recipe||[]){need[r.ing]=(need[r.ing]||0)+r.qty*n}costSum+=typeCost(t)*n}
-  h+='<div class="card"><div class="sec"><span>Hisoblagich</span><span class="sub">nechta yopilsa, nima ketadi</span></div>'+
-    ty.map(t=>'<div style="display:flex;justify-content:space-between;align-items:center"><span>'+esc(t.name)+'</span><div class="stepper"><button data-act="calc" data-t="'+t.id+'" data-n="-10" aria-label="10 ta kamaytirish" style="font-size:12px">−10</button><input class="inp num" data-calc="'+t.id+'" inputmode="numeric" value="'+(calcCounts[t.id]||"")+'" placeholder="0" aria-label="'+esc(t.name)+' soni" style="width:64px;min-height:38px;text-align:center;padding:0 4px"><button class="plus" data-act="calc" data-t="'+t.id+'" data-n="10" aria-label="10 ta qo\'shish" style="font-size:12px">+10</button></div></div>').join("");
-  if(cnt){h+='<div style="border-top:1px solid var(--line);padding-top:6px">'+Object.keys(need).filter(i=>S.ings[i]).map(i=>{const g=S.ings[i];return '<div class="ingrow" style="padding:5px 0"><span>'+esc(g.name)+'</span><span class="b num">'+(uinfo(g).f===1?sp(Math.ceil(need[i]))+" ta":showQty(need[i],g))+'</span></div>'}).join("")+
-    '<div class="ingrow" style="padding:6px 0"><span class="b">'+cnt+' ta somsa tannarxi</span><span class="xb num" style="font-size:17px">'+som(costSum)+'</span></div></div>'}
-  h+='</div>';
   h+='<div class="sec"><span>Somsa turlari</span><button class="btn small" data-act="edtype">+ Yangi kalkulyatsiya</button></div>';
   h+=ty.length?ty.map(t=>{const tc=typeCost(t);return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span class="sec">'+esc(t.name)+'</span><button class="btn ghost small" data-act="edtype" data-id="'+t.id+'">Tahrirlash</button></div>'+
     (t.recipe||[]).filter(r=>S.ings[r.ing]).map(r=>{const i=S.ings[r.ing];return '<div style="display:flex;justify-content:space-between;gap:8px" class="small"><span>'+esc(r.label||i.name)+' <span class="muted">'+(uinfo(i).f===1?(Math.round(r.qty*1000)/1000).toString().replace(".",",")+" ta":(Math.round(r.qty*10)/10).toString().replace(".",",")+" "+baseLabel(i))+'</span></span><span class="num">'+sp(r.qty*ppb(i))+'</span></div>'}).join("")+
     '<div style="display:flex;justify-content:space-between;border-top:1px solid var(--line);padding-top:8px;gap:8px"><span>1 dona tannarxi</span><span class="xb num" style="font-size:17px">'+som(tc)+'</span></div><div style="display:flex;justify-content:space-between;gap:8px" class="small muted"><span>Sotuv narxi '+sp(t.price)+'</span><span style="color:var(--ok);font-weight:700">foyda '+sp(t.price-tc)+'</span></div></div>'}).join(""):'<div class="card empty">Hali kalkulyatsiya yo\'q.</div>';
   h+='<div class="sec"><span>Masalliqlar va narxlar</span><button class="btn small" data-act="eding">+ Masalliq</button></div><div class="list">'+ings().map(i=>'<div class="row" role="button" tabindex="0" data-act="eding" data-id="'+i.id+'" style="cursor:pointer"><div class="col"><span class="b">'+esc(i.name)+'</span><span class="small muted">'+som(i.packPrice)+' / '+(i.packQty||1)+' '+uinfo(i).name+'</span></div><span class="small muted num">'+som(ppb(i)*uinfo(i).f)+' / '+uinfo(i).name+'</span></div>').join("")+'</div>';
+  return h;
+}
+
+/* ---------- KALKULYATOR: kalkulyatsiyadagi retseptlarni olib, songa ko'paytiradi ---------- */
+function gramTxt(q,i){const u=uinfo(i);if(u.f===1)return sp(Math.ceil(q-1e-9))+" ta";const t=sp(q)+" "+u.base;return q>=1000?t+' <span class="small muted">('+showQty(q,i)+')</span>':t}
+function vKalkulyator(){
+  let h=backBar()+header("Kalkulyator","Son yozing — kalkulyatsiyadagi retsept bo'yicha hisoblaydi");
+  const ty=types();
+  h+='<div class="card">'+ty.map(t=>'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><label for="kc_'+t.id+'" class="b">'+esc(t.name)+'</label><div class="stepper"><button data-act="calc" data-t="'+t.id+'" data-n="-10" aria-label="10 ta kamaytirish" style="font-size:12px">−10</button><input class="inp num" id="kc_'+t.id+'" data-calc="'+t.id+'" inputmode="numeric" value="'+(calcCounts[t.id]||"")+'" placeholder="0" style="width:70px;min-height:38px;text-align:center;padding:0 4px"><button class="plus" data-act="calc" data-t="'+t.id+'" data-n="10" aria-label="10 ta qo\'shish" style="font-size:12px">+10</button></div></div>').join("")+
+    '<button class="linkbtn" data-act="calcclear" style="align-self:flex-start;padding:2px 0">Tozalash</button></div>';
+  const sel=ty.filter(t=>(+calcCounts[t.id]||0)>0);
+  if(!sel.length)return h+'<div class="card empty">Somsa turiga son yozing. Masalan, go\'shtli — 50.</div>';
+  const need={};let cnt=0,cost=0;
+  for(const t of sel){const n=+calcCounts[t.id];cnt+=n;cost+=typeCost(t)*n;
+    const lines=(t.recipe||[]).filter(r=>S.ings[r.ing]);
+    h+='<div class="card"><div class="sec"><span>'+esc(t.name)+' — '+n+' ta</span></div>'+(lines.length?lines.map(r=>{const i=S.ings[r.ing];const q=r.qty*n;need[r.ing]=(need[r.ing]||0)+q;
+      return '<div class="ingrow"><span>'+esc(r.label||i.name)+' <span class="small muted">'+(uinfo(i).f===1?String(r.qty).replace(".",","):String(r.qty).replace(".",",")+" "+baseLabel(i))+' × '+n+'</span></span><span class="b num" style="text-align:right">'+gramTxt(q,i)+'</span></div>'}).join(""):'<div class="muted">Bu turning kalkulyatsiyasi kiritilmagan.</div>')+'</div>'}
+  if(sel.length>1){h+='<div class="card"><div class="sec"><span>Jami kerak — '+cnt+' ta somsa</span></div>'+Object.keys(need).map(k=>{const i=S.ings[k];return '<div class="ingrow"><span>'+esc(i.name)+'</span><span class="b num" style="text-align:right">'+gramTxt(need[k],i)+'</span></div>'}).join("")+'</div>'}
+  h+='<div class="card" style="gap:2px"><span class="small muted">'+cnt+' ta somsa tannarxi</span><span class="xb num" style="font-size:20px">'+som(cost)+'</span></div>';
   return h;
 }
 
@@ -801,6 +814,7 @@ document.addEventListener("click",e=>{
   else if(a==="menu")openDrawer();else if(a==="drawerclose")closeDrawer();
   else if(a==="calc"){calcCounts[b.dataset.t]=Math.max(0,(+calcCounts[b.dataset.t]||0)+(+b.dataset.n));render()}
   else if(a==="qseg"){qseg=b.dataset.k;render()}
+  else if(a==="calcclear"){for(const k in calcCounts)delete calcCounts[k];render()}
   else if(a==="cred")mCred(b.dataset.n);else if(a==="crednew")mCredEntry("",1,0);
   else if(a==="kirim")mKirim();else if(a==="kassastart")mKassaStart();else if(a==="kdel")mKassaDel(b.dataset.kind,b.dataset.id);
   else if(a==="mother"){closeDrawer();preview=preview===null?"ishchi":preview==="ishchi"?"kuzatuvchi":null;window.scrollTo(0,0);render()}
