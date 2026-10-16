@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=13';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=14';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "13";
+const APP_V = "14";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -753,7 +753,7 @@ function mTayyor(){
 }
 function mSemi(id){
   const sm=id?JSON.parse(JSON.stringify(S.semi[id])):{name:"",recipe:[],yield:1000,show:true,min:0,order:semis().length+1};
-  const opts=sel=>ings().map(i=>'<option value="'+i.id+'"'+(i.id===sel?" selected":"")+'>'+esc(i.name)+' ('+baseLabel(i)+')</option>').join("");
+  const opts=sel=>'<option value=""'+(sel?"":" selected")+' disabled>— Masalliqni tanlang —</option>'+ings().map(i=>'<option value="'+i.id+'"'+(i.id===sel?" selected":"")+'>'+esc(i.name)+' ('+baseLabel(i)+')</option>').join("");
   const rows=()=>(sm.recipe||[]).map((r,k)=>'<div class="inrow"><select class="inp" data-r="'+k+'" data-f="ing" aria-label="Masalliq">'+opts(r.ing)+'</select><input class="inp num" style="max-width:100px" data-r="'+k+'" data-f="qty" inputmode="decimal" value="'+String(r.qty).replace(".",",")+'" aria-label="Miqdor"><button class="btn ghost small" type="button" data-rm="'+k+'" aria-label="O\'chirish">✕</button></div>').join("");
   openModal(mHead(id?sm.name:"Yarim tayyor mahsulot")+'<div class="field"><label for="sm_name">Nomi</label><input class="inp" id="sm_name" value="'+esc(sm.name)+'" placeholder="masalan: Marinovkali go\'sht"></div><div class="sec">Bir partiya uchun</div><div class="small muted">Miqdorlar g, ml yoki ta da. Masalan: mol go\'shti 1000, tuz 15, zira 5.</div><div id="sm_rows" style="display:flex;flex-direction:column;gap:8px">'+rows()+'</div><button class="btn ghost wide" type="button" id="sm_add">+ Masalliq</button><div class="grid2"><div class="field"><label for="sm_yield">Chiqadi (g)</label><input class="inp num" id="sm_yield" inputmode="decimal" value="'+sm.yield+'"></div><div class="field"><label for="sm_min">Kam qolsa xabar (kg)</label><input class="inp num" id="sm_min" inputmode="decimal" value="'+String(sm.min||0).replace(".",",")+'"></div></div><div class="card" style="gap:2px"><span class="small muted">1 kg narxi</span><span class="xb num" id="sm_cost" style="font-size:20px"></span></div><button class="btn wide" id="sm_save">Saqlash</button>'+(id?'<button class="btn danger wide" id="sm_del">O\'chirish</button>':""),m=>{
     const box=m.querySelector("#sm_rows");
@@ -761,7 +761,7 @@ function mSemi(id){
     const cost=()=>{sync();m.querySelector("#sm_cost").textContent=som(semiPpb(sm)*1000)};
     box.addEventListener("input",cost);box.addEventListener("change",cost);m.querySelector("#sm_yield").addEventListener("input",cost);
     box.addEventListener("click",e=>{const b=e.target.closest("[data-rm]");if(!b)return;sync();sm.recipe.splice(+b.dataset.rm,1);box.innerHTML=rows();cost()});
-    m.querySelector("#sm_add").addEventListener("click",()=>{sync();const f=ings()[0];sm.recipe.push({ing:f?f.id:"",qty:0});box.innerHTML=rows();cost()});
+    m.querySelector("#sm_add").addEventListener("click",()=>{sync();sm.recipe.push({ing:"",qty:0});box.innerHTML=rows();cost();const ns=box.querySelectorAll('select[data-f="ing"]');const last=ns[ns.length-1];if(last){last.scrollIntoView({block:"center",behavior:"smooth"});last.focus()}});
     cost();
     m.querySelector("#sm_save").addEventListener("click",async()=>{sync();const name=m.querySelector("#sm_name").value.trim();if(!name){toast("Nomini kiriting");return}if(!(sm.yield>0)){toast("Qancha chiqishini yozing");return}
       try{await run(sb.from("semi").upsert({id:id||slug(name),name,recipe:sm.recipe.filter(r=>r.ing&&r.qty>0),yield:sm.yield,min:num(m.querySelector("#sm_min").value)||0,show:sm.show!==false,sort:sm.order||99}),"Saqlandi");closeModal()}catch(e){}});
@@ -831,12 +831,12 @@ function mExpDel(id){
 function slug(s){return (String(s).toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")||"x")+"_"+Math.random().toString(36).slice(2,6)}
 function mType(id,draft){
   const t=draft||(id?JSON.parse(JSON.stringify(S.types[id])):{name:"",price:0,order:types().length+1,recipe:[]});
-  const ingOpts=sel=>'<optgroup label="Yarim tayyor">'+semis().map(sm=>'<option value="s:'+sm.id+'"'+("s:"+sm.id===sel?" selected":"")+'>'+esc(sm.name)+' (g)</option>').join("")+'</optgroup><optgroup label="Masalliqlar">'+ings().map(i=>'<option value="'+i.id+'"'+(i.id===sel?" selected":"")+'>'+esc(i.name)+' ('+baseLabel(i)+')</option>').join("")+'</optgroup>';
+  const ingOpts=sel=>'<option value=""'+(sel?"":" selected")+' disabled>— Masalliqni tanlang —</option>'+'<optgroup label="Yarim tayyor">'+semis().map(sm=>'<option value="s:'+sm.id+'"'+("s:"+sm.id===sel?" selected":"")+'>'+esc(sm.name)+' (g)</option>').join("")+'</optgroup><optgroup label="Masalliqlar">'+ings().map(i=>'<option value="'+i.id+'"'+(i.id===sel?" selected":"")+'>'+esc(i.name)+' ('+baseLabel(i)+')</option>').join("")+'</optgroup>';
   const rows=()=>(t.recipe||[]).map((r,k)=>'<div class="card" style="gap:6px"><div class="inrow"><select class="inp" data-r="'+k+'" data-f="ing" aria-label="Masalliq">'+ingOpts(r.ing)+'</select><input class="inp num" style="max-width:96px" data-r="'+k+'" data-f="qty" inputmode="decimal" value="'+String(r.qty).replace(".",",")+'" aria-label="Miqdor"></div><div class="inrow"><input class="inp" data-r="'+k+'" data-f="label" placeholder="Onamga ko\'rinadigan nom (ixtiyoriy)" value="'+esc(r.label||"")+'" aria-label="Nom"></div><div style="display:flex;justify-content:space-between;align-items:center"><label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-r="'+k+'" data-f="show"'+(r.show?" checked":"")+'> Onamga ko\'rinsin</label><button class="btn danger small" type="button" data-rm="'+k+'">O\'chirish</button></div></div>').join("");
   const h=mHead(id?"Somsa turi":"Yangi tur")+'<div class="field"><label for="t_name">Nomi</label><input class="inp" id="t_name" value="'+esc(t.name)+'"></div><div class="grid2"><div class="field"><label for="t_price">Asosiy narx (so\'m)</label><input class="inp num" id="t_price" inputmode="numeric" value="'+(t.price||"")+'"></div><div class="field"><label for="t_ord">Tartib</label><input class="inp num" id="t_ord" inputmode="numeric" value="'+(t.order||"")+'"></div></div><div class="sec">Retsept — 1 ta somsaga</div><div class="small muted">Miqdor masalliqning o\'lchovida: g, ml yoki ta. Masalan karobka 20 ta somsaga 1 ta bo\'lsa — 0,05.</div><div id="t_rows" style="display:flex;flex-direction:column;gap:8px">'+rows()+'</div><div class="grid2"><button class="btn ghost" type="button" id="t_add">+ Masalliq qo\'shish</button><button class="btn ghost" type="button" id="t_newing">+ Yangi masalliq</button></div><button class="btn wide" id="t_save" style="min-height:52px">Saqlash</button>'+(id?'<button class="btn danger wide" id="t_del">Bu turni o\'chirish</button>':"");
   openModal(h,m=>{const box=m.querySelector("#t_rows");
     const sync=()=>box.querySelectorAll("[data-r]").forEach(el=>{const r=t.recipe[+el.dataset.r];const f=el.dataset.f;if(f==="show")r.show=el.checked;else if(f==="qty")r.qty=num(el.value)||0;else r[f]=el.value});
-    m.querySelector("#t_add").addEventListener("click",()=>{sync();const first=ings()[0];t.recipe.push({ing:first?first.id:"",qty:0,show:true,label:""});box.innerHTML=rows()});
+    m.querySelector("#t_add").addEventListener("click",()=>{sync();t.recipe.push({ing:"",qty:0,show:true,label:""});box.innerHTML=rows();const ns=box.querySelectorAll('select[data-f="ing"]');const last=ns[ns.length-1];if(last){last.scrollIntoView({block:"center",behavior:"smooth"});last.focus()}});
     box.addEventListener("click",e=>{const b=e.target.closest("[data-rm]");if(!b)return;sync();t.recipe.splice(+b.dataset.rm,1);box.innerHTML=rows()});
     m.querySelector("#t_newing").addEventListener("click",()=>{sync();t.name=m.querySelector("#t_name").value;t.price=num(m.querySelector("#t_price").value)||0;mIng(null,newId=>{t.recipe.push({ing:newId,qty:0,show:true,label:""});mType(id,t)})});
     m.querySelector("#t_save").addEventListener("click",async()=>{sync();const name=m.querySelector("#t_name").value.trim();if(!name){toast("Nomini kiriting");return}
