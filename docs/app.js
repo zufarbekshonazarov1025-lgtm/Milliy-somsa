@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=19';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=20';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "19";
+const APP_V = "20";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -57,6 +57,13 @@ function niceDate(s){const d=new Date(s+"T12:00:00");return WDAYS[d.getDay()]+",
 function shortDate(s){const d=new Date(s+"T12:00:00");return String(d.getDate()).padStart(2,"0")+"."+String(d.getMonth()+1).padStart(2,"0")+"."+d.getFullYear()}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function sp(n){const r=Math.round(+n||0);return (r<0?"−":"")+String(Math.abs(r)).replace(/\B(?=(\d{3})+(?!\d))/g," ")}
+/* Pul maydonlari: yozish paytida 100000 → 100 000 */
+function groupDigits(v){const str=String(v==null?"":v);const neg=/^\s*[-−]/.test(str);const d=str.replace(/[^\d]/g,"");return (neg&&d?"-":"")+d.replace(/\B(?=(\d{3})+(?!\d))/g," ")}
+function fmtNumInputs(root){if(!root||!root.querySelectorAll)return;const list=root.matches&&root.matches('input[inputmode="numeric"]')?[root]:root.querySelectorAll('input[inputmode="numeric"]');list.forEach(el=>{if(!el.value)return;const f=groupDigits(el.value);if(f!==el.value)el.value=f})}
+document.addEventListener("input",e=>{const el=e.target;if(!el||el.tagName!=="INPUT"||el.getAttribute("inputmode")!=="numeric")return;
+  const pos=el.selectionStart==null?el.value.length:el.selectionStart;const before=el.value.slice(0,pos).replace(/[^\d]/g,"").length;const f=groupDigits(el.value);if(f===el.value)return;el.value=f;
+  let i=0,n=0;while(i<f.length&&n<before){if(/\d/.test(f[i]))n++;i++}try{el.setSelectionRange(i,i)}catch(_){}},true);
+new MutationObserver(ms=>{for(const m of ms)for(const nd of m.addedNodes)if(nd.nodeType===1)fmtNumInputs(nd)}).observe(document.documentElement,{childList:true,subtree:true});
 function som(n){return sp(n)+" so'm"}
 function num(v){if(v==null)return NaN;return parseFloat(String(v).replace(/\s/g,"").replace(",","."))}
 function uinfo(ing){return UNITS[ing&&ing.unit]||UNITS.kg}
@@ -650,7 +657,7 @@ function shopRefresh(){const c=clientOf(selShop);if(!c)return;const sd=shopDraft
   const q=id=>document.getElementById(id);if(q("shopcalc"))q("shopcalc").innerHTML=shopCalcHtml(c,k);if(q("sd_quick"))q("sd_quick").innerHTML=shopQuick(k);if(q("sd_left"))q("sd_left").innerHTML=shopLeft(k);
   const z=delivState(c).z||{};for(const t in sd.given){const el=q("gd_"+t);if(!el)continue;const v=+sd.given[t]||0,zz=+z[t]||0;el.textContent=v!==zz?(v<zz?"zakazdan "+(zz-v)+" ta kam":"zakazdan "+(v-zz)+" ta ko'p"):""}}
 document.addEventListener("input",e=>{const el=e.target.closest&&e.target.closest("[data-sdin]");if(!el||!selShop)return;const c=clientOf(selShop);const sd=shopDraft(c);const kd=el.dataset.sdin;
-  if(kd==="paid")sd.paid=el.value.replace(/[^\d]/g,"");else{const obj=kd==="g"?sd.given:sd.ret;obj[el.dataset.t]=Math.max(0,parseInt(el.value,10)||0)}shopRefresh()});
+  if(kd==="paid")sd.paid=el.value.replace(/[^\d]/g,"");else{const obj=kd==="g"?sd.given:sd.ret;obj[el.dataset.t]=Math.max(0,parseInt(el.value.replace(/\s/g,""),10)||0)}shopRefresh()});
 async function shopSave(){const c=clientOf(selShop);const sd=shopDraft(c);const k=shopCalc(c,sd);
   const given={},ret={};for(const t in sd.given)given[t]=+sd.given[t]||0;for(const t in sd.ret)if(+sd.ret[t])ret[t]=+sd.ret[t];
   const d=viewDate;await saveDelivery(c.id,given,ret,k.paid);
@@ -753,7 +760,7 @@ function mFix(cid){
   if(retTs.length)h+='<div class="card"><span class="b">Qaytdi ('+shortDate(s.prev.date)+' dagi)</span>'+retTs.map(t=>'<div style="display:flex;justify-content:space-between;align-items:center"><span>'+esc(S.types[t].name)+'</span>'+stepHtml("r",t,+ret[t]||0)+'</div>').join("")+'</div>';
   h+='<div class="field"><label for="fx_paid">Olindi (so\'m)</label><input class="inp num" id="fx_paid" inputmode="numeric" value="'+Math.round(s.dl?s.dl.paid:Math.max(0,s.due))+'"></div><div class="small muted" id="fx_hint"></div><button class="btn ok wide" id="fx_save" style="min-height:52px">Saqlash — Berildi</button>';
   openModal(h,m=>{const hint=m.querySelector("#fx_hint");const paid=m.querySelector("#fx_paid");let touched=!!s.dl;
-    const upd=()=>{const d=calc();hint.textContent="Hisob bo'yicha olinadi: "+som(Math.max(0,d));if(!touched)paid.value=Math.round(Math.max(0,d))};upd();
+    const upd=()=>{const d=calc();hint.textContent="Hisob bo'yicha olinadi: "+som(Math.max(0,d));if(!touched)paid.value=groupDigits(Math.round(Math.max(0,d)))};upd();
     paid.addEventListener("input",()=>touched=true);
     m.addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;const obj=b.dataset.step==="g"?given:ret;const t=b.dataset.t;obj[t]=Math.max(0,(+obj[t]||0)+(+b.dataset.n));m.querySelector("#"+b.dataset.step+"_"+t).textContent=obj[t];upd()});
     m.querySelector("#fx_save").addEventListener("click",async()=>{const p=num(paid.value);closeModal();await saveDelivery(cid,given,ret,isNaN(p)?0:p)})});
@@ -823,7 +830,7 @@ async function buildExcel(a,z){
   uy.push([]);uy.push(["Jami","","",Math.round(us)]);sheets.push(["Uyga o'tkazilgan",uy,[11,22,12,14,26]]);
   // Ombor
   const om=[["Masalliq","Qoldiq","Narxi (1 birlik)","Qiymati (so'm)"]];let os=0;
-  for(const i of stockItems()){const v=(+i.stock||0)*(i.semi?(+i.packPrice||0)/1000:ppb(i));om.push([i.name,showQty(+i.stock||0,i),Math.round(i.semi?+i.packPrice||0:ppb(i)*uinfo(i).f)+" / "+(i.semi?"kg":uinfo(i).name),Math.round(v)]);os+=v}
+  for(const i of stockItems()){const v=(+i.stock||0)*(i.semi?(+i.packPrice||0)/1000:ppb(i));om.push([i.name,showQty(+i.stock||0,i),sp(i.semi?+i.packPrice||0:ppb(i)*uinfo(i).f)+" / "+(i.semi?"kg":uinfo(i).name),Math.round(v)]);os+=v}
   om.push([]);om.push(["Jami","","",Math.round(os)]);sheets.push(["Ombor qoldig'i",om,[24,14,18,14]]);
   // Xulosa
   const xl=[["Milliy somsa — hisobot"],["Davr",shortDate(a)+" — "+shortDate(z)],["Tayyorlandi",shortDate(ymd(new Date()))],[],
@@ -831,7 +838,7 @@ async function buildExcel(a,z){
     ["Do'konlar qarzi (hozir)",Math.round(clients().reduce((s,c)=>s+Math.max(0,clientBalance(c.id)),0))],["Bizning qarzimiz (hozir)",Math.round(credBalances().reduce((s,x)=>s+Math.max(0,x.b),0))],["Kassada (hozir)",Math.round(kassaBalance())]];
   sheets.unshift(["Xulosa",xl,[28,24]]);
   const wb=X.utils.book_new();
-  for(const [n,rows,w] of sheets){const ws=X.utils.aoa_to_sheet(rows);ws["!cols"]=w.map(x=>({wch:x}));X.utils.book_append_sheet(wb,ws,n)}
+  for(const [n,rows,w] of sheets){const ws=X.utils.aoa_to_sheet(rows);ws["!cols"]=w.map(x=>({wch:x}));for(const ad in ws){const cl=ws[ad];if(ad[0]!=="!"&&cl&&cl.t==="n"&&Math.abs(cl.v)>=1000)cl.z="# ##0"}X.utils.book_append_sheet(wb,ws,n)}
   const name="Milliy-somsa_"+a+"_"+z+".xlsx";
   const b64=X.write(wb,{type:"base64",bookType:"xlsx"});
   const mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -1089,7 +1096,7 @@ document.addEventListener("click",e=>{
   else if(a==="shopedit"){const c=clientOf(selShop);if(c)shopDraft(c).edit=true;render()}
   else if(a==="shopcancel"){delete SD[viewDate+"|"+selShop];render()}
   else if(a==="shopsave")shopSave();
-  else if(a==="sdpaid"){const c=clientOf(selShop);if(!c)return;shopDraft(c).paid=b.dataset.v;const el=document.getElementById("sd_paid");if(el)el.value=b.dataset.v;shopRefresh()}
+  else if(a==="sdpaid"){const c=clientOf(selShop);if(!c)return;shopDraft(c).paid=b.dataset.v;const el=document.getElementById("sd_paid");if(el)el.value=groupDigits(b.dataset.v);shopRefresh()}
   else if(a==="sd"){const c=clientOf(selShop);if(!c)return;const sd=shopDraft(c);const obj=b.dataset.k==="g"?sd.given:sd.ret;const t=b.dataset.t;obj[t]=Math.max(0,(+obj[t]||0)+(+b.dataset.n));
     const inp=document.querySelector('[data-sdin="'+b.dataset.k+'"][data-t="'+t+'"]');if(inp)inp.value=obj[t];shopRefresh()}
   else if(a==="nak")mNak(b.dataset.c);
@@ -1101,14 +1108,14 @@ document.addEventListener("click",e=>{
   else if(a==="zax"){const v=Object.assign({},S.config,{zaxira:Math.max(0,(+S.config.zaxira||0)+(+b.dataset.n))});S.config=v;render();run(sb.from("settings").upsert({key:"main",value:v}))}
   else if(a==="edtype")mType(b.dataset.id);else if(a==="edclient")mClient(b.dataset.id);else if(a==="eding")mIng(b.dataset.id);
   else if(a==="history")mHistory();
-  else if(a==="drsave"){const mx=num(document.getElementById("dr_max").value),dd=parseInt(document.getElementById("dr_days").value,10);if(!(mx>=0)||!(dd>=0)){toast("Raqamni to'g'ri kiriting");return}
+  else if(a==="drsave"){const mx=num(document.getElementById("dr_max").value),dd=parseInt(document.getElementById("dr_days").value.replace(/\s/g,""),10);if(!(mx>=0)||!(dd>=0)){toast("Raqamni to'g'ri kiriting");return}
     const v=Object.assign({},S.config,{debtMax:mx,debtDays:dd});S.config=v;run(sb.from("settings").upsert({key:"main",value:v}),"Saqlandi").then(render).catch(()=>{})}
   else if(a==="excel")mExcel();
   else if(a==="logout"){closeDrawer();sb.auth.signOut()}
 });
 document.getElementById("modalwrap").addEventListener("click",e=>{if(e.target.id==="modalwrap")closeModal()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")window.somsaBack();else if((e.key==="Enter"||e.key===" ")&&e.target.matches&&e.target.matches('[role="button"][data-act]')){e.preventDefault();e.target.click()}});
-document.addEventListener("change",e=>{const el=e.target.closest&&e.target.closest("[data-calc]");if(!el)return;calcCounts[el.dataset.calc]=Math.max(0,parseInt(el.value,10)||0);render()});
+document.addEventListener("change",e=>{const el=e.target.closest&&e.target.closest("[data-calc]");if(!el)return;calcCounts[el.dataset.calc]=Math.max(0,parseInt(el.value.replace(/\s/g,""),10)||0);render()});
 // Dastur ochiq qolib, yangi kun boshlansa: "Bugun"ni ko'rib turgan bo'lsa, yangi kunga (0 zakazli) o'tadi
 let lastToday=ymd(new Date());
 function rollDay(){const t=ymd(new Date());if(t===lastToday)return false;const was=viewDate===lastToday;lastToday=t;if(was){viewDate=t;K.date=null;return true}return false}
