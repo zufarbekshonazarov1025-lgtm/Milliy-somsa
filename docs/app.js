@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=12';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=13';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "12";
+const APP_V = "13";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -36,6 +36,8 @@ const ICONS = {
   hisob:'<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M21 20H3"/>',
   sozlama:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'
 };
+// Admin uchun pastki panel: eng ko'p ishlatiladigan bo'limlar. Qolganlari ☰ menyuda.
+const ADMIN_TABS = ["dashboard","bugun","yetkazish","ombor","kalkulyator"];
 const TAB_NAMES = { kalk:"Kalkulyatsiya", kalkulyator:"Kalkulyator", kassa:"Hisob-kitob", qarzlar:"Qarzlar", dashboard:"Dashboard", koproq:"Ko'proq", bugun:"Bugun", yetkazish:"Yetkazish", ombor:"Ombor", hisob:"Hisob", sozlama:"Sozlama" };
 
 const S = { types:{}, ings:{}, clients:{}, days:{}, moves:{}, debts:{}, payments:{}, expenses:{}, cashIn:{}, cred:{}, kassa:{}, semi:{}, config:{zaxira:2}, profiles:{} };
@@ -222,16 +224,17 @@ function render(){
     main.innerHTML=vKuzatuv();return;
   }
   const VIEWS={dashboard:vDashboard,koproq:vKoproq,bugun:vBugun,yetkazish:vYetkazish,ombor:vOmbor,hisob:vHisob,sozlama:vSozlama,kalk:vKalk,kalkulyator:vKalkulyator,kassa:vKassa,qarzlar:vQarzlar};
+  let allowed;
   if(!isMother()){
     if(!VIEWS[tab]||tab==="koproq")tab="dashboard";
-    document.getElementById("nav").hidden=true;
-    const y=window.scrollY;main.innerHTML=VIEWS[tab]();window.scrollTo(0,y);return;
+    allowed=ADMIN_TABS;
+  }else{
+    allowed=["bugun","yetkazish"];
+    if(!allowed.includes(tab))tab="bugun";
   }
-  const allowed=["bugun","yetkazish"];const inMore=false;
-  if(!allowed.includes(tab))tab="bugun";
   const nav=document.getElementById("navin");
   nav.style.gridTemplateColumns="repeat("+allowed.length+",minmax(0,1fr))";
-  nav.innerHTML=allowed.map(k=>'<button data-act="tab" data-k="'+k+'" class="'+((tab===k||(k==="koproq"&&inMore))?"on":"")+'" aria-current="'+(tab===k?"page":"false")+'">'+svg(k)+TAB_NAMES[k]+'</button>').join("");
+  nav.innerHTML=allowed.map(k=>'<button data-act="tab" data-k="'+k+'" class="'+(tab===k?"on":"")+'" aria-current="'+(tab===k?"page":"false")+'">'+svg(k)+'<span class="nl">'+TAB_NAMES[k]+'</span></button>').join("");
   document.getElementById("nav").hidden=false;
   const fn=VIEWS[tab];
   const y=window.scrollY;main.innerHTML=fn();window.scrollTo(0,y);
@@ -316,7 +319,7 @@ function openDrawer(){
 }
 function closeDrawer(){const d=document.getElementById("drawer");if(d)d.hidden=true}
 function drawerOpen(){const d=document.getElementById("drawer");return d&&!d.hidden}
-function backBar(){return role()==="admin"&&tab!=="dashboard"?'<button class="linkbtn" data-act="go" data-k="dashboard" style="align-self:flex-start;padding:2px 0;text-decoration:none;font-weight:600">← Dashboard</button>':""}
+function backBar(){return role()==="admin"&&!ADMIN_TABS.includes(tab)?'<button class="linkbtn" data-act="go" data-k="dashboard" style="align-self:flex-start;padding:2px 0;text-decoration:none;font-weight:600">← Dashboard</button>':""}
 
 /* ---------- KALKULYATSIYA ---------- */
 const calcCounts={};
