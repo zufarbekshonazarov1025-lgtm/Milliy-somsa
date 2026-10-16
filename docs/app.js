@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=17';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=18';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "17";
+const APP_V = "18";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -311,7 +311,7 @@ function vDashboard(){
 }
 function vKoproq(){
   const it=(k,t,s)=>'<button class="row" data-act="tab" data-k="'+k+'" style="border:none;background:none;width:100%;text-align:left;border-bottom:1px solid var(--line)"><div class="col"><span class="b">'+t+'</span><span class="small muted">'+s+'</span></div><span aria-hidden="true">›</span></button>';
-  return header("Ko'proq")+'<div class="list">'+it("hisob","Hisob","Savdo, tan narx, foyda, xarajatlar, qarzlar")+it("sozlama","Sozlama","Retsept, narx, mijozlar, foydalanuvchilar")+'</div>';
+  return header("Ko'proq")+'<div class="list">'+it("hisob","Hisob","Savdo, foyda, xarajatlar, qarzlar")+it("sozlama","Sozlama","Retsept, narx, mijozlar, foydalanuvchilar")+'</div>';
 }
 
 /* ---------- ☰ MENYU (admin) ---------- */
@@ -373,7 +373,6 @@ function vKalkulyator(){
     h+='<div class="card"><div class="sec"><span>'+esc(t.name)+' — '+n+' ta</span></div>'+(lines.length?lines.map(r=>{const it=refItem(r.ing);const q=r.qty*n;need[r.ing]=(need[r.ing]||0)+q;
       return '<div class="ingrow"><span>'+esc(r.label||it.name)+' <span class="small muted">'+String(r.qty).replace(".",",")+(it.f===1?"":" "+it.base)+' × '+n+'</span></span><span class="b num" style="text-align:right">'+gramTxt(q,it)+'</span></div>'}).join(""):'<div class="muted">Bu turning kalkulyatsiyasi kiritilmagan.</div>')+'</div>'}
   if(sel.length>1){h+='<div class="card"><div class="sec"><span>Jami kerak — '+cnt+' ta somsa</span></div>'+Object.keys(need).map(k=>{const it=refItem(k);return '<div class="ingrow"><span>'+esc(it.name)+'</span><span class="b num" style="text-align:right">'+gramTxt(need[k],it)+'</span></div>'}).join("")+'</div>'}
-  h+='<div class="card" style="gap:2px"><span class="small muted">'+cnt+' ta somsa tannarxi</span><span class="xb num" style="font-size:20px">'+som(cost)+'</span></div>';
   return h;
 }
 
@@ -644,8 +643,8 @@ function vHisob(){
   for(const e of Object.values(S.expenses))if(e.category==="Uy uchun"&&inPeriod(e.date))home+=e.amount;
   for(const p of Object.values(S.payments))if(inPeriod(p.date))paid+=p.amount;
   h+='<div class="grid2">'+[["Sotildi",sp(giv-ret)+" ta"],["Savdo",som(rev)],["Tushgan pul",som(paid)],["Foyda (taxminan)",som(rev-cost-expSum)]].map(([a,b])=>'<div class="card" style="gap:2px"><span class="small muted">'+a+'</span><span class="xb num" style="font-size:18px">'+b+'</span></div>').join("")+'</div>';
-  h+='<div class="list">'+[["Zakaz",sp(zak)+" ta"],["Berildi",sp(giv)+" ta"],["Zakazdan kam berildi",sp(Math.max(0,zak-giv))+" ta"],["Qaytdi",sp(ret)+" ta"],["Somsa tan narxi",som(cost)],["Boshqa xarajatlar",som(expSum)],["Xaridlar",som(buy)],["Uyga o'tkazildi",som(home)]].map(([a,b])=>'<div class="row"><span>'+a+'</span><span class="b num">'+b+'</span></div>').join("")+'</div>';
-  h+='<div class="grid2"><button class="btn ghost" data-act="go" data-k="kassa">Kassa va rasxodlar</button><button class="btn ghost" data-act="go" data-k="kalk">Tannarx</button></div>';
+  h+='<div class="list">'+[["Zakaz",sp(zak)+" ta"],["Berildi",sp(giv)+" ta"],["Zakazdan kam berildi",sp(Math.max(0,zak-giv))+" ta"],["Qaytdi",sp(ret)+" ta"],["Boshqa xarajatlar",som(expSum)],["Xaridlar",som(buy)],["Uyga o'tkazildi",som(home)]].map(([a,b])=>'<div class="row"><span>'+a+'</span><span class="b num">'+b+'</span></div>').join("")+'</div>';
+  h+='<div class="grid2"><button class="btn ghost" data-act="go" data-k="kassa">Kassa va rasxodlar</button><button class="btn ghost" data-act="go" data-k="kalk">Kalkulyatsiya</button></div>';
   return h;
 }
 
