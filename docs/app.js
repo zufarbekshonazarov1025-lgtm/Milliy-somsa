@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=15';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=16';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "15";
+const APP_V = "16";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -28,6 +28,7 @@ const ICONS = {
   kassa:'<rect x="2" y="6" width="20" height="13" rx="2"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 10h.01M18 15h.01"/>',
   qarzlar:'<path d="M17 3l4 4-4 4"/><path d="M21 7H9"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h12"/>',
   menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',
+  uy:'<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M12 17s-3-1.8-3-3.6a1.5 1.5 0 0 1 3-.6 1.5 1.5 0 0 1 3 .6c0 1.8-3 3.6-3 3.6z"/>',
   dashboard:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   koproq:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   bugun:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
@@ -38,7 +39,7 @@ const ICONS = {
 };
 // Admin uchun pastki panel: eng ko'p ishlatiladigan bo'limlar. Qolganlari ☰ menyuda.
 const ADMIN_TABS = ["dashboard","bugun","yetkazish","ombor","kalkulyator"];
-const TAB_NAMES = { kalk:"Kalkulyatsiya", kalkulyator:"Kalkulyator", kassa:"Hisob-kitob", qarzlar:"Qarzlar", dashboard:"Dashboard", koproq:"Ko'proq", bugun:"Bugun", yetkazish:"Yetkazish", ombor:"Ombor", hisob:"Hisob", sozlama:"Sozlama" };
+const TAB_NAMES = { kalk:"Kalkulyatsiya", kalkulyator:"Kalkulyator", kassa:"Hisob-kitob", qarzlar:"Qarzlar", uy:"Uyga", dashboard:"Dashboard", koproq:"Ko'proq", bugun:"Bugun", yetkazish:"Yetkazish", ombor:"Ombor", hisob:"Hisob", sozlama:"Sozlama" };
 
 const S = { types:{}, ings:{}, clients:{}, days:{}, moves:{}, debts:{}, payments:{}, expenses:{}, cashIn:{}, cred:{}, kassa:{}, semi:{}, config:{zaxira:2}, profiles:{} };
 const LOGIN_DOMAIN = "milliysomsa.uz";
@@ -101,7 +102,7 @@ const LOAD = {
   types: async()=>{const {data,error}=await sb.from("somsa_types").select("*");if(error)throw error;S.types=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,price:+r.price,order:r.sort,recipe:r.recipe||[]}]))},
   clients: async()=>{const {data,error}=await sb.from("clients").select("*");if(error)throw error;S.clients=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,place:r.place,when:r.when_text,order:r.sort,types:r.types||[],prices:r.prices||{},payMode:r.pay_mode,startDebt:+r.start_debt}]))},
   days: async()=>{const {data,error}=await sb.from("days").select("*");if(error)throw error;S.days=Object.fromEntries((data||[]).map(r=>[r.date,{orders:r.orders||{},deliveries:r.deliveries||{},consumed:r.consumed||{}}]))},
-  moves: async()=>{const {data,error}=await sb.from("moves").select("*").order("at",{ascending:false}).limit(500);if(error)throw error;S.moves=Object.fromEntries((data||[]).map(r=>[r.id,{kind:r.kind,date:r.date,items:r.items||[],total:+r.total,at:r.at,supplier:r.supplier||"",pay:r.pay||"naqd"}]))},
+  moves: async()=>{const {data,error}=await sb.from("moves").select("*").order("at",{ascending:false}).limit(500);if(error)throw error;S.moves=Object.fromEntries((data||[]).map(r=>[r.id,{kind:r.kind,date:r.date,items:r.items||[],total:+r.total,at:r.at,supplier:r.supplier||"",pay:r.pay||"naqd",note:r.note||"",by:r.by}]))},
   debts: async()=>{const {data,error}=await sb.from("debts").select("*");if(error)throw error;S.debts=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,amount:+r.amount,note:r.note,date:r.date}]))},
   config: async()=>{const {data,error}=await sb.from("settings").select("*");if(error)throw error;const m=Object.fromEntries((data||[]).map(r=>[r.key,r.value]));S.config=m.main||{zaxira:2};S.kassa=m.kassa||{}},
   semi: async()=>{const {data,error}=await sb.from("semi").select("*");if(error)throw error;S.semi=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,recipe:r.recipe||[],yield:+r.yield,show:r.show,order:r.sort,stock:+r.stock,min:+r.min}]))},
@@ -223,7 +224,7 @@ function render(){
     if(K.date!==viewDate&&!K.loading){fetchKuzatuv(viewDate)}
     main.innerHTML=vKuzatuv();return;
   }
-  const VIEWS={dashboard:vDashboard,koproq:vKoproq,bugun:vBugun,yetkazish:vYetkazish,ombor:vOmbor,hisob:vHisob,sozlama:vSozlama,kalk:vKalk,kalkulyator:vKalkulyator,kassa:vKassa,qarzlar:vQarzlar};
+  const VIEWS={dashboard:vDashboard,koproq:vKoproq,bugun:vBugun,yetkazish:vYetkazish,ombor:vOmbor,hisob:vHisob,sozlama:vSozlama,kalk:vKalk,kalkulyator:vKalkulyator,kassa:vKassa,qarzlar:vQarzlar,uy:vUy};
   let allowed;
   if(!isMother()){
     if(!VIEWS[tab]||tab==="koproq")tab="dashboard";
@@ -305,6 +306,7 @@ const MENU = [
   ["kalkulyator","Kalkulyator","Nechta somsaga nima kerak"],
   ["kassa","Hisob-kitob","Kassa: kirim va rasxod"],
   ["qarzlar","Qarzlar","Bizga va bizning qarzlar"],
+  ["uy","Uyga o'tkazilgan","Uyga ketgan masalliq va xarajatlar"],
   ["hisob","Hisobot","Savdo, sotuv, davr bo'yicha"],
   ["sozlama","Sozlama","Mijozlar, foydalanuvchilar"]
 ];
@@ -592,7 +594,7 @@ async function saveDelivery(cid,given,returned,paid){
 /* OMBOR */
 function vOmbor(){
   let h=backBar()+header("Ombor","Qoldiq chegaradan kamaysa, xabar chiqadi");
-  h+='<div class="grid2"><button class="btn" data-act="xarid">Xarid</button><button class="btn navy" data-act="tayyor">Tayyorlash</button><button class="btn ghost" data-act="uyga">Uyga o\'tkazish</button><button class="btn ghost" data-act="sanash">Sanash</button></div>';
+  h+='<div class="grid2"><button class="btn" data-act="xarid">Xarid</button><button class="btn navy" data-act="tayyor">Tayyorlash</button><button class="btn ghost" data-act="uyga">Uyga o\'tkazish</button><button class="btn ghost" data-act="sanash">Sanash</button></div><button class="linkbtn" data-act="go" data-k="uy" style="align-self:flex-start;padding:2px 0">Uyga o\'tkazilganlar ro\'yxati →</button>';
   const list=stockItems();
   if(!list.length)return h+'<div class="card empty">Masalliqlar hali kiritilmagan.</div>';
   if(!Object.values(S.moves).some(m=>m.kind==="sanash"||m.kind==="xarid"))h+='<div class="alert"><b>Ombor hali sanalmagan</b><span>Boshlash uchun "Sanash" tugmasini bosib, hozir bor masalliqni kiriting.</span></div>';
@@ -606,7 +608,7 @@ function vOmbor(){
 }
 
 /* HISOB */
-function inPeriod(k){const t=ymd(new Date());if(period==="bugun")return k===t;if(period==="hafta")return k>addDays(t,-7)&&k<=t;return k.slice(0,7)===t.slice(0,7)&&k<=t}
+function inPeriod(k){const t=ymd(new Date());if(period==="hammasi")return k<=t;if(period==="bugun")return k===t;if(period==="hafta")return k>addDays(t,-7)&&k<=t;return k.slice(0,7)===t.slice(0,7)&&k<=t}
 function sellRate(cid){const t=ymd(new Date());let g=0,r=0;for(const k of dayKeys()){const dl=(S.days[k].deliveries||{})[cid];if(!dl||!dl.done)continue;if(k>addDays(t,-7)&&k<=t)g+=sumObj(dl.given);if(k>addDays(t,-6)&&k<=addDays(t,1))r+=sumObj(dl.returned)}return g?Math.max(0,Math.round((1-r/g)*100)):null}
 function vHisob(){
   let h=backBar()+header("Hisobot","Savdo va sotuv, davr bo'yicha");
@@ -617,7 +619,8 @@ function vHisob(){
       for(const t in dl.given||{})perType[t]=(perType[t]||0)+(+dl.given[t]||0);for(const t in dl.returned||{})perType[t]=(perType[t]||0)-(+dl.returned[t]||0)}}
   for(const t in perType){const ty=S.types[t];if(ty)cost+=perType[t]*typeCost(ty)}
   let buy=0,home=0;for(const m of Object.values(S.moves)){if(!inPeriod(m.date))continue;if(m.kind==="xarid")buy+=m.total||0;if(m.kind==="uyga")home+=m.total||0}
-  const exps=Object.entries(S.expenses).map(([id,e])=>({id,...e})).filter(e=>inPeriod(e.date)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));const expSum=exps.reduce((x,e)=>x+e.amount,0);
+  const exps=Object.entries(S.expenses).map(([id,e])=>({id,...e})).filter(e=>inPeriod(e.date)&&e.category!=="Uy uchun").sort((a,b)=>String(b.date).localeCompare(String(a.date)));const expSum=exps.reduce((x,e)=>x+e.amount,0);
+  for(const e of Object.values(S.expenses))if(e.category==="Uy uchun"&&inPeriod(e.date))home+=e.amount;
   for(const p of Object.values(S.payments))if(inPeriod(p.date))paid+=p.amount;
   h+='<div class="grid2">'+[["Sotildi",sp(giv-ret)+" ta"],["Savdo",som(rev)],["Tushgan pul",som(paid)],["Foyda (taxminan)",som(rev-cost-expSum)]].map(([a,b])=>'<div class="card" style="gap:2px"><span class="small muted">'+a+'</span><span class="xb num" style="font-size:18px">'+b+'</span></div>').join("")+'</div>';
   h+='<div class="list">'+[["Zakaz",sp(zak)+" ta"],["Berildi",sp(giv)+" ta"],["Zakazdan kam berildi",sp(Math.max(0,zak-giv))+" ta"],["Qaytdi",sp(ret)+" ta"],["Somsa tan narxi",som(cost)],["Boshqa xarajatlar",som(expSum)],["Xaridlar",som(buy)],["Uyga o'tkazildi",som(home)]].map(([a,b])=>'<div class="row"><span>'+a+'</span><span class="b num">'+b+'</span></div>').join("")+'</div>';
@@ -705,15 +708,62 @@ function mXarid(){
     if(!items.length){toast("Hech narsa kiritilmadi");return}
     try{await run(sb.rpc("adjust_stock",{changes}));await Promise.all(priceW);await run(sb.from("moves").insert({kind:"xarid",date,items,total}),"Xarid saqlandi");closeModal()}catch(e){}})});
 }
+/* UYGA O'TKAZILGAN: ombordan uyga olingan masalliq + kassadagi "Uy uchun" rasxodlari */
+function uyEvents(){
+  const ev=[];
+  for(const [id,m] of Object.entries(S.moves)){if(m.kind!=="uyga")continue;
+    for(const it of m.items||[]){const i=stockItem(it.ing);ev.push({id,kind:"move",date:m.date,at:m.at||m.date,ing:it.ing,name:i?i.name:"(o'chirilgan masalliq)",qtyTxt:i?showQty(it.qty,i):"",sum:+it.sum||0,note:m.note,by:m.by})}}
+  for(const [id,e] of Object.entries(S.expenses))if(e.category==="Uy uchun")ev.push({id,kind:"exp",date:e.date,at:e.at||e.date,name:e.note||"Uy uchun",qtyTxt:"kassadan",sum:+e.amount||0,cash:true});
+  return ev.sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at).localeCompare(String(a.at)));
+}
+function vUy(){
+  let h=backBar()+header("Uyga o'tkazilgan","Somsa hisobidan uyga ketgan narsalar");
+  const all=uyEvents();const ev=all.filter(e=>inPeriod(e.date));const tot=ev.reduce((s,e)=>s+e.sum,0);
+  const t=ymd(new Date());const mon=all.filter(e=>e.date.slice(0,7)===t.slice(0,7)&&e.date<=t).reduce((s,e)=>s+e.sum,0);
+  const pd=new Date(t+"T12:00:00");pd.setDate(1);pd.setMonth(pd.getMonth()-1);const pk=ymd(pd).slice(0,7);
+  const prev=all.filter(e=>e.date.slice(0,7)===pk).reduce((s,e)=>s+e.sum,0);
+  h+='<div class="hero pat"><div class="lbl">Shu oy uyga ketdi</div><div class="xb num" style="font-size:34px;line-height:1.1">'+som(mon)+'</div><div class="hint">O\'tgan oy ('+MONTHS[pd.getMonth()]+'): '+som(prev)+'</div></div>';
+  h+='<div class="grid2"><button class="btn" data-act="uyga">+ Ombordan uyga</button><button class="btn navy" data-act="uyexp">+ Pul bilan (kassadan)</button></div>';
+  h+='<div class="chips">'+[["bugun","Bugun"],["hafta","7 kun"],["oy","Shu oy"],["hammasi","Hammasi"]].map(([k,l])=>'<button class="chip '+(period===k?"on":"")+'" data-act="period" data-k="'+k+'">'+l+'</button>').join("")+'</div>';
+  if(!ev.length)return h+'<div class="card empty"><b>Bu davrda uyga hech narsa o\'tkazilmagan</b><span>Ombordan olingan masalliq yoki kassadan "Uy uchun" rasxodi shu yerda ko\'rinadi.</span></div>';
+  // nima qancha ketdi
+  const by={};for(const e of ev){const k=e.kind==="move"?e.ing:"__cash";const g=by[k]=by[k]||{name:e.kind==="move"?e.name:"Pul bilan (kassadan)",qty:0,sum:0,n:0,ing:e.kind==="move"?e.ing:null};g.sum+=e.sum;g.n++;
+    if(e.kind==="move"){const m=S.moves[e.id];for(const it of m.items||[])if(it.ing===e.ing)g.qty+=+it.qty||0}}
+  const grp=Object.values(by).sort((a,b)=>b.sum-a.sum);
+  h+='<div class="card"><div class="sec"><span>Jami</span><span class="xb num">'+som(tot)+'</span></div>'+grp.map(g=>{const i=g.ing?stockItem(g.ing):null;
+    return '<div class="ingrow"><span>'+esc(g.name)+' <span class="small muted">'+(i?showQty(g.qty,i)+" · ":"")+g.n+' marta</span></span><span class="b num">'+som(g.sum)+'</span></div>'}).join("")+'</div>';
+  // sanalar bo'yicha
+  const days={};for(const e of ev)(days[e.date]=days[e.date]||[]).push(e);
+  h+='<div class="sec">Qachon va nima</div>';
+  for(const d of Object.keys(days).sort().reverse()){const L=days[d];const ds=L.reduce((s,e)=>s+e.sum,0);
+    h+='<div class="list"><div class="row" style="background:var(--line)"><span class="b">'+esc(niceDate(d))+'</span><span class="b num">'+som(ds)+'</span></div>'+L.map(e=>{const tm=e.at&&e.at.length>10?new Date(e.at).toTimeString().slice(0,5):"";const who=e.by&&S.profiles[e.by]?S.profiles[e.by].name:"";
+      return '<div class="row" role="button" tabindex="0" data-act="uydel" data-kind="'+e.kind+'" data-id="'+e.id+'" style="cursor:pointer"><div class="col"><span class="b">'+esc(e.name)+(e.qtyTxt?' <span class="small muted">'+esc(e.qtyTxt)+'</span>':"")+'</span><span class="small muted">'+[tm,who,e.kind==="move"?e.note:""].filter(Boolean).map(esc).join(" · ")+'</span></div><span class="b num" style="white-space:nowrap">'+som(e.sum)+'</span></div>'}).join("")+'</div>'}
+  h+='<div class="small muted">Yozuvni bosib bekor qilish mumkin — masalliq omborga qaytadi.</div>';
+  return h;
+}
+function mUyDel(kind,id){
+  if(kind==="exp"){mKassaDel("exp",id);return}
+  const mv=S.moves[id];if(!mv)return;
+  const txt=(mv.items||[]).map(it=>{const i=stockItem(it.ing);return i?esc(i.name)+" "+showQty(it.qty,i):""}).filter(Boolean).join(", ");
+  openModal(mHead("Uyga o'tkazish")+'<div class="card"><span class="b">'+txt+'</span><span class="small muted">'+shortDate(mv.date)+' · '+som(mv.total)+(mv.note?" · "+esc(mv.note):"")+'</span></div><button class="btn danger wide" id="ud_yes">Bekor qilish — omborga qaytarish</button><button class="btn ghost wide" data-act="close">Yopish</button>',m=>{
+    m.querySelector("#ud_yes").addEventListener("click",async()=>{const ch={};for(const it of mv.items||[])ch[it.ing]=(ch[it.ing]||0)+(+it.qty||0);
+      try{await run(sb.rpc("adjust_stock",{changes:ch}));await run(sb.from("moves").delete().eq("id",id),"Bekor qilindi, omborga qaytdi");closeModal()}catch(e){}})});
+}
+function mUyExp(){
+  openModal(mHead("Uy uchun — kassadan")+'<div class="small muted">Somsa pulidan uy uchun qilingan xarajat (gaz, bozorlik, to\'lov…). Kassadan ayriladi.</div><div class="field"><label for="ue_amt">Summa (so\'m)</label><input class="inp num" id="ue_amt" inputmode="numeric"></div><div class="field"><label for="ue_note">Nima uchun?</label><input class="inp" id="ue_note" placeholder="masalan: uyning gazi"></div><div class="field"><label for="ue_date">Sana</label><input class="inp" type="date" id="ue_date" value="'+ymd(new Date())+'"></div><div class="err" id="ue_err" style="color:var(--bad)"></div><button class="btn wide" id="ue_save">Saqlash</button>',m=>{
+    m.querySelector("#ue_save").addEventListener("click",async()=>{const a=num(m.querySelector("#ue_amt").value);const note=m.querySelector("#ue_note").value.trim();const err=m.querySelector("#ue_err");
+      if(!(a>0)){err.textContent="Summani kiriting";return}if(!note){err.textContent="Nima uchun ekanini yozing";return}
+      const d=m.querySelector("#ue_date").value||ymd(new Date());try{await run(sb.from("expenses").insert({category:"Uy uchun",amount:a,date:d,note}));closeModal();showSaved(d,"Uy xarajati")}catch(e){}})});
+}
 function mUyga(){
   const list=ings();
-  const h=mHead("Uyga o'tkazish")+'<div class="field"><label for="u_ing">Masalliq</label><select class="inp" id="u_ing">'+list.map(i=>'<option value="'+i.id+'">'+esc(i.name)+' (omborda '+showQty(+i.stock||0,i)+')</option>').join("")+'</select></div><div class="field"><label for="u_q">Miqdor</label><div class="inrow"><input class="inp num" id="u_q" inputmode="decimal"><span class="tag" id="u_unit"></span></div></div><div class="b num" id="u_sum"></div><button class="btn wide" id="u_save" style="min-height:52px">Uyga o\'tkazish</button>';
+  const h=mHead("Uyga o'tkazish")+'<div class="field"><label for="u_ing">Masalliq</label><select class="inp" id="u_ing">'+list.map(i=>'<option value="'+i.id+'">'+esc(i.name)+' (omborda '+showQty(+i.stock||0,i)+')</option>').join("")+'</select></div><div class="field"><label for="u_q">Miqdor</label><div class="inrow"><input class="inp num" id="u_q" inputmode="decimal"><span class="tag" id="u_unit"></span></div></div><div class="b num" id="u_sum"></div><div class="field"><label for="u_note">Izoh (ixtiyoriy)</label><input class="inp" id="u_note" placeholder="masalan: mehmonlarga palov"></div><div class="field"><label for="u_date">Sana</label><input class="inp" type="date" id="u_date" value="'+ymd(new Date())+'"></div><button class="btn wide" id="u_save" style="min-height:52px">Uyga o\'tkazish</button>';
   openModal(h,m=>{const sel=m.querySelector("#u_ing"),q=m.querySelector("#u_q");
     const upd=()=>{const i=S.ings[sel.value];m.querySelector("#u_unit").textContent=uinfo(i).name;const v=num(q.value);m.querySelector("#u_sum").textContent=v>0?"Puli: "+som(v*uinfo(i).f*ppb(i)):""};upd();
     sel.addEventListener("change",upd);q.addEventListener("input",upd);
     m.querySelector("#u_save").addEventListener("click",async()=>{const i=S.ings[sel.value];const v=num(q.value);if(!(v>0)){toast("Miqdorni kiriting");return}
       const base=v*uinfo(i).f,s=base*ppb(i);
-      try{await run(sb.rpc("adjust_stock",{changes:{[sel.value]:-base}}));await run(sb.from("moves").insert({kind:"uyga",date:ymd(new Date()),items:[{ing:sel.value,qty:base,sum:s}],total:s}),"Uyga o'tkazildi");closeModal()}catch(e){}})});
+      try{await run(sb.rpc("adjust_stock",{changes:{[sel.value]:-base}}));const d=m.querySelector("#u_date").value||ymd(new Date());await run(sb.from("moves").insert({kind:"uyga",date:d,items:[{ing:sel.value,qty:base,sum:s}],total:s,note:m.querySelector("#u_note").value.trim()||null}),"Uyga o'tkazildi: "+som(s));closeModal()}catch(e){}})});
 }
 function mSanash(){
   const list=stockItems();
@@ -903,7 +953,7 @@ document.addEventListener("click",e=>{
   else if(a==="give"){const c=clientOf(b.dataset.c);if(!c)return;const s=delivState(c);saveDelivery(c.id,s.given,s.returned,Math.max(0,s.due))}
   else if(a==="fix")mFix(b.dataset.c);
   else if(a==="nak")mNak(b.dataset.c);
-  else if(a==="xarid")mXarid2();else if(a==="tayyor")mTayyor();else if(a==="edsemi")mSemi(b.dataset.id);else if(a==="uyga")mUyga();else if(a==="sanash")mSanash();
+  else if(a==="xarid")mXarid2();else if(a==="tayyor")mTayyor();else if(a==="edsemi")mSemi(b.dataset.id);else if(a==="uyga")mUyga();else if(a==="uydel")mUyDel(b.dataset.kind,b.dataset.id);else if(a==="uyexp")mUyExp();else if(a==="sanash")mSanash();
   else if(a==="period"){period=b.dataset.k;render()}
   else if(a==="debt")mDebt();else if(a==="debtpay")mDebtPay(b.dataset.id);
   else if(a==="pay")mPay(b.dataset.c);else if(a==="akt")mAkt(b.dataset.c);
