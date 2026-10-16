@@ -2,7 +2,17 @@ package uz.somsa.app;
 
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
+import android.content.ContentValues;
 import android.content.Intent;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.util.Base64;
+import android.webkit.JavascriptInterface;
+import androidx.core.content.FileProvider;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -56,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
         s.setUserAgentString(s.getUserAgentString() + " SomsaApp/1");
         CookieManager.getInstance().setAcceptCookie(true);
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        web.addJavascriptInterface(new Native(), "SomsaNative");
 
         web.setWebViewClient(new WebViewClient() {
             @Override
@@ -89,6 +100,44 @@ public class MainActivity extends AppCompatActivity {
         });
 
         if (state != null) web.restoreState(state); else web.loadUrl(HOME);
+    }
+
+    /** Dasturdan fayl (masalan Excel) saqlash: Yuklanmalar papkasiga yozadi va "Ulashish" oynasini ochadi. */
+    private class Native {
+        @JavascriptInterface
+        public String saveFile(String name, String mime, String b64) {
+            try {
+                byte[] data = Base64.decode(b64, Base64.DEFAULT);
+                String safe = name.replaceAll("[^A-Za-z0-9._'-]", "_");
+                Uri uri;
+                if (Build.VERSION.SDK_INT >= 29) {
+                    ContentValues v = new ContentValues();
+                    v.put(MediaStore.Downloads.DISPLAY_NAME, safe);
+                    v.put(MediaStore.Downloads.MIME_TYPE, mime);
+                    v.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Milliy somsa");
+                    uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+                    if (uri == null) throw new Exception("insert");
+                    try (OutputStream o = getContentResolver().openOutputStream(uri)) { o.write(data); }
+                } else {
+                    File dir = new File(getCacheDir(), "export");
+                    dir.mkdirs();
+                    File f = new File(dir, safe);
+                    try (FileOutputStream o = new FileOutputStream(f)) { o.write(data); }
+                    uri = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".files", f);
+                }
+                final Uri u = uri;
+                runOnUiThread(() -> {
+                    Intent send = new Intent(Intent.ACTION_SEND);
+                    send.setType(mime);
+                    send.putExtra(Intent.EXTRA_STREAM, u);
+                    send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    try { startActivity(Intent.createChooser(send, "Faylni yuborish yoki ochish")); } catch (Exception ignored) {}
+                });
+                return Build.VERSION.SDK_INT >= 29 ? "Saqlandi: Yuklanmalar / Milliy somsa" : "Fayl tayyor";
+            } catch (Exception e) {
+                return "Faylni saqlab bo'lmadi";
+            }
+        }
     }
 
     private void openOutside(Uri uri) {
