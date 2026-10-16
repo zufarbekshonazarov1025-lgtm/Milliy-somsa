@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=20';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=21';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "20";
+const APP_V = "21";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -63,6 +63,8 @@ function fmtNumInputs(root){if(!root||!root.querySelectorAll)return;const list=r
 document.addEventListener("input",e=>{const el=e.target;if(!el||el.tagName!=="INPUT"||el.getAttribute("inputmode")!=="numeric")return;
   const pos=el.selectionStart==null?el.value.length:el.selectionStart;const before=el.value.slice(0,pos).replace(/[^\d]/g,"").length;const f=groupDigits(el.value);if(f===el.value)return;el.value=f;
   let i=0,n=0;while(i<f.length&&n<before){if(/\d/.test(f[i]))n++;i++}try{el.setSelectionRange(i,i)}catch(_){}},true);
+// Ba'zi Android klaviaturalari "input" ni kechiktiradi: chiqishda ham formatlaymiz
+for(const ev of ["compositionend","change","blur","keyup"])document.addEventListener(ev,e=>{const el=e.target;if(el&&el.tagName==="INPUT"&&el.getAttribute("inputmode")==="numeric"&&el.value){const f=groupDigits(el.value);if(f!==el.value){const end=el.selectionStart===el.value.length;el.value=f;if(end)try{el.setSelectionRange(f.length,f.length)}catch(_){}}}},true);
 new MutationObserver(ms=>{for(const m of ms)for(const nd of m.addedNodes)if(nd.nodeType===1)fmtNumInputs(nd)}).observe(document.documentElement,{childList:true,subtree:true});
 function som(n){return sp(n)+" so'm"}
 function num(v){if(v==null)return NaN;return parseFloat(String(v).replace(/\s/g,"").replace(",","."))}
