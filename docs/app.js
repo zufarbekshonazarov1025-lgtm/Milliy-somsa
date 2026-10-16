@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=14';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=15';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "14";
+const APP_V = "15";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -382,18 +382,22 @@ function vKassa(){
     return '<div class="row"'+del+'><div class="col"><span class="b">'+esc(e.txt)+'</span><span class="small muted">'+shortDate(e.date)+(e.src?" · "+esc(e.src):"")+'</span></div><span class="b num" style="color:'+(e.inn?"var(--ok)":"var(--bad)")+';white-space:nowrap">'+(e.inn?"+"+sp(e.inn):"−"+sp(e.out))+'</span></div>'}).join("")+'</div>':'<div class="card empty">Bu davrda kirim yoki rasxod yo\'q.</div>';
   return h;
 }
+// Yozuv tanlangan davrda ko'rinmasa, uni ko'rsatadigan davrga o'tadi va sanasini aytadi
+function showSaved(d,what){const t=ymd(new Date());if(d===t){toast(what+" saqlandi");return}
+  if(!inPeriod(d)){for(const p of ["hafta","oy"]){period=p;if(inPeriod(d))break}}
+  toast(what+" "+shortDate(d)+" sanasiga yozildi");render()}
 const EXP_CATS2=["Gaz","O'tin / ko'mir","Benzin","Paket","Elektr","Ish haqi","Ijara","Uy uchun","Boshqa"];
 function mRasxod(){
   openModal(mHead("Rasxod qilish")+'<div class="field"><label for="ex_cat">Turi</label><select class="inp" id="ex_cat">'+EXP_CATS2.map(c=>'<option>'+esc(c)+'</option>').join("")+'</select></div><div class="field"><label for="ex_amt">Summa (so\'m)</label><input class="inp num" id="ex_amt" inputmode="numeric"></div><div class="field"><label for="ex_note">Nima uchun?</label><input class="inp" id="ex_note" placeholder="masalan: 2 ta gaz ballon"></div><div class="field"><label for="ex_date">Sana</label><input class="inp" type="date" id="ex_date" value="'+ymd(new Date())+'"></div><div class="err" id="ex_err" style="color:var(--bad)"></div><button class="btn wide" id="ex_save">Saqlash</button>',m=>{
     m.querySelector("#ex_save").addEventListener("click",async()=>{const a=num(m.querySelector("#ex_amt").value);const note=m.querySelector("#ex_note").value.trim();const err=m.querySelector("#ex_err");
       if(!(a>0)){err.textContent="Summani kiriting";return}if(!note){err.textContent="Nima uchun qilinganini yozing";return}
-      try{await run(sb.from("expenses").insert({category:m.querySelector("#ex_cat").value,amount:a,date:m.querySelector("#ex_date").value||ymd(new Date()),note}),"Rasxod saqlandi");closeModal()}catch(e){}})});
+      const d=m.querySelector("#ex_date").value||ymd(new Date());try{await run(sb.from("expenses").insert({category:m.querySelector("#ex_cat").value,amount:a,date:d,note}));closeModal();showSaved(d,"Rasxod")}catch(e){}})});
 }
 function mKirim(){
   openModal(mHead("Kirim")+'<div class="field"><label for="ki_amt">Summa (so\'m)</label><input class="inp num" id="ki_amt" inputmode="numeric"></div><div class="field"><label for="ki_note">Qayerdan?</label><input class="inp" id="ki_note" placeholder="masalan: chakana sotuv"></div><div class="field"><label for="ki_date">Sana</label><input class="inp" type="date" id="ki_date" value="'+ymd(new Date())+'"></div><div class="small muted">Do\'konlardan olingan pullar kassaga o\'zi tushadi, ularni bu yerga yozmang.</div><div class="err" id="ki_err" style="color:var(--bad)"></div><button class="btn wide" id="ki_save">Saqlash</button>',m=>{
     m.querySelector("#ki_save").addEventListener("click",async()=>{const a=num(m.querySelector("#ki_amt").value);const note=m.querySelector("#ki_note").value.trim();const err=m.querySelector("#ki_err");
       if(!(a>0)){err.textContent="Summani kiriting";return}if(!note){err.textContent="Qayerdan kelganini yozing";return}
-      try{await run(sb.from("cash_in").insert({amount:a,note,date:m.querySelector("#ki_date").value||ymd(new Date())}),"Kirim saqlandi");closeModal()}catch(e){}})});
+      const d=m.querySelector("#ki_date").value||ymd(new Date());try{await run(sb.from("cash_in").insert({amount:a,note,date:d}));closeModal();showSaved(d,"Kirim")}catch(e){}})});
 }
 function mKassaStart(){
   const st=S.kassa||{};
