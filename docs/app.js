@@ -838,7 +838,7 @@ async function buildExcel(a,z){
     ["Do'konlar qarzi (hozir)",Math.round(clients().reduce((s,c)=>s+Math.max(0,clientBalance(c.id)),0))],["Bizning qarzimiz (hozir)",Math.round(credBalances().reduce((s,x)=>s+Math.max(0,x.b),0))],["Kassada (hozir)",Math.round(kassaBalance())]];
   sheets.unshift(["Xulosa",xl,[28,24]]);
   const wb=X.utils.book_new();
-  for(const [n,rows,w] of sheets){const ws=X.utils.aoa_to_sheet(rows);ws["!cols"]=w.map(x=>({wch:x}));for(const ad in ws){const cl=ws[ad];if(ad[0]!=="!"&&cl&&cl.t==="n"&&Math.abs(cl.v)>=1000)cl.z="# ##0"}X.utils.book_append_sheet(wb,ws,n)}
+  for(const [n,rows,w] of sheets){const ws=X.utils.aoa_to_sheet(rows);ws["!cols"]=w.map(x=>({wch:x}));for(const ad in ws){const cl=ws[ad];if(ad[0]!=="!"&&cl&&cl.t==="n"&&Math.abs(cl.v)>=1000)cl.z="#,##0"}X.utils.book_append_sheet(wb,ws,n)}
   const name="Milliy-somsa_"+a+"_"+z+".xlsx";
   const b64=X.write(wb,{type:"base64",bookType:"xlsx"});
   const mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
