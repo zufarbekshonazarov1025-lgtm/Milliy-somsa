@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=18';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=19';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "18";
+const APP_V = "19";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -586,10 +586,11 @@ function vYetkazish(){
   const cl=clients().filter(c=>{const z=sumObj(ordersOf(viewDate)[c.id]);const dl=(day(viewDate).deliveries||{})[c.id];const prev=prevDelivery(c.id,viewDate);return z>0||dl||(prev&&prev.date===addDays(viewDate,-1)&&sumObj(prev.given)>0)});
   if(!cl.length)return h+'<div class="card empty"><b>Bu kunga zakaz yo\'q</b><span>Zakazlar "Bugun" bo\'limida kiritiladi.</span></div>';
   const doneN=cl.filter(c=>((day(viewDate).deliveries||{})[c.id]||{}).done).length;
-  h+='<div class="sec"><span>'+doneN+' / '+cl.length+' berildi</span></div>';
-  for(const c of cl){const s=delivState(c);const done=s.dl&&s.dl.done;
-    h+='<div class="card '+(done?"done":"")+'"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div class="col"><span class="b" style="font-size:16px">'+esc(c.name)+'</span><span class="small" style="color:var(--bad);font-weight:600">'+esc(c.when||"")+'</span></div><div class="col" style="align-items:flex-end"><span class="xb num" style="font-size:17px">'+sumObj(s.given)+' ta</span><span class="sub num">'+som(s.givenSum)+'</span></div></div>';
-    h+='<div class="small muted">'+s.ts.filter(t=>s.given[t]).map(t=>esc(S.types[t].name)+" "+s.given[t]+" × "+sp(s.priceMap[t])).join(" · ")+(s.zSum!==sumObj(s.given)?' · <span class="pill warn">zakaz '+s.zSum+' ta</span>':"")+'</div>';
+  h+='<div class="sec"><span>'+doneN+' / '+cl.length+' do\'kon bajarildi</span></div>';
+  for(const c of cl){const s=delivState(c);const done=s.dl&&s.dl.done;const only=!s.zSum&&!sumObj(s.given);
+    h+='<div class="card '+(done?"done":"")+'"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div class="col"><span class="b" style="font-size:16px">'+esc(c.name)+'</span><span class="small" style="color:var(--bad);font-weight:600">'+esc(c.when||"")+'</span></div>'+(only?'<span class="pill warn">Bugun zakaz yo\'q</span>':'<div class="col" style="align-items:flex-end"><span class="xb num" style="font-size:17px">'+sumObj(s.given)+' ta</span><span class="sub num">'+som(s.givenSum)+'</span></div>')+'</div>';
+    if(only&&!done)h+='<div class="small muted">Somsa olib borilmaydi — faqat kechagi pul va qaytgan somsa olinadi.</div>';
+    if(!only)h+='<div class="small muted">'+s.ts.filter(t=>s.given[t]).map(t=>esc(S.types[t].name)+" "+s.given[t]+" × "+sp(s.priceMap[t])).join(" · ")+(s.zSum!==sumObj(s.given)?' · <span class="pill warn">zakaz '+s.zSum+' ta</span>':"")+'</div>';
     if(s.prev){h+='<div class="box"><span class="small muted">'+shortDate(s.prev.date)+': '+sumObj(s.prev.given)+' ta berilgan</span>';
       if(!done&&s.prevTs.length)h+=s.prevTs.map(t=>'<div style="display:flex;justify-content:space-between;align-items:center"><span>Qaytdi — '+esc(S.types[t].name)+'</span><div class="stepper"><button data-act="ret" data-c="'+c.id+'" data-t="'+t+'" data-n="-1" aria-label="Kamaytirish">−</button><span class="val num">'+(+s.returned[t]||0)+'</span><button data-act="ret" data-c="'+c.id+'" data-t="'+t+'" data-n="1" aria-label="Ko\'paytirish">+</button></div></div>').join("");
       else if(done)h+='<span class="small">Qaytdi: '+sumObj(s.returned)+' ta</span>';
@@ -597,7 +598,7 @@ function vYetkazish(){
     if(done){h+='<div class="box"><span class="small muted">Olindi</span><span class="xb num" style="font-size:18px">'+som(s.dl.paid||0)+'</span><span class="small">Qolgan qarz: '+som(clientBalance(c.id,viewDate))+'</span></div><div class="grid2"><button class="btn ghost small" data-act="nak" data-c="'+c.id+'">Nakladnoy</button><button class="btn ghost small" data-act="fix" data-c="'+c.id+'">O\'zgartirish</button></div>'}
     else{const old=s.before-(s.mode==="ertasi"?s.prevSum:0);
       h+='<div class="box"><span class="small muted">'+(s.mode==="ertasi"?"Kechagi zakaz uchun olinadi":"Bugungi zakaz uchun olinadi")+'</span><span class="xb num" style="font-size:20px">'+som(Math.max(0,s.due))+'</span>'+(old>0?'<span class="small" style="color:var(--bad)">Eski qarz: '+som(old)+'</span>':"")+'</div>'+(()=>{const di=debtInfo(c.id);return di.flag?'<div class="alert bad"><b>Qarzni undirish kerak: '+som(di.bal)+'</b><span>'+esc(di.why)+'. Bugun eski qarzni ham so\'rang.</span></div>':""})()+
-      '<div style="display:flex;gap:8px"><button class="btn ok" style="flex:1;min-height:52px" data-act="give" data-c="'+c.id+'">Hammasi to\'g\'ri — Berildi</button><button class="btn ghost" data-act="fix" data-c="'+c.id+'">Tuzatish</button></div>'}
+      '<div style="display:flex;gap:8px"><button class="btn ok" style="flex:1;min-height:52px" data-act="give" data-c="'+c.id+'">'+(only?"Pul va qaytganini oldim":"Hammasi to\'g\'ri — Berildi")+'</button><button class="btn ghost" data-act="fix" data-c="'+c.id+'">Tuzatish</button></div>'}
     h+='<button class="linkbtn" data-act="pay" data-c="'+c.id+'" style="align-self:flex-start;padding:2px 0">Faqat qarz to\'lovi oldim</button></div>'}
   return h;
 }
