@@ -125,5 +125,6 @@ pre.nak{white-space:pre-wrap;background:var(--card);border-radius:12px;padding:1
 .mitem.on{background:var(--card)}
 .mitem.on svg{color:var(--orange)}
 
-.nav.n6 button{font-size:10px;gap:3px}
+.nav.n6 button{font-size:9.5px;letter-spacing:-.2px;gap:3px;padding-left:0;padding-right:0}
+.nav.n6 button .nl{padding:0}
 .nav.n6 button svg{width:20px;height:20px}
