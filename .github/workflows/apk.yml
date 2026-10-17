@@ -1,4 +1,5 @@
 name: APK yig'ish
+# 2026-10-17: v27 (onam 6 bo'lim, qaytgandan berish, test tuzatishlari)
 on:
   workflow_dispatch:
   push:
