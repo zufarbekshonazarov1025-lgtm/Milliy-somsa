@@ -1,6 +1,10 @@
 package uz.somsa.app;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.pm.PackageManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import android.content.ActivityNotFoundException;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -100,10 +104,36 @@ public class MainActivity extends AppCompatActivity {
         });
 
         if (state != null) web.restoreState(state); else web.loadUrl(HOME);
+
+        // Xabarnomalar: kanal, ruxsat (Android 13+) va davriy tekshiruv
+        NotifyWorker.createChannel(this);
+        NotifyWorker.schedule(this);
     }
 
     /** Dasturdan fayl (masalan Excel) saqlash: Yuklanmalar papkasiga yozadi va "Ulashish" oynasini ochadi. */
+    private void askNotifyPermission() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7);
+        }
+    }
+
     private class Native {
+        /** Kirgandan keyin dastur shu telefonning xabarnoma kalitini beradi. */
+        @JavascriptInterface
+        public void setNotifyKey(String key) {
+            if (key == null || key.isEmpty()) return;
+            NotifyWorker.start(MainActivity.this, key);
+            runOnUiThread(MainActivity.this::askNotifyPermission);
+        }
+
+        /** Hisobdan chiqilganda xabarnomalar to'xtaydi. */
+        @JavascriptInterface
+        public void clearNotifyKey() { NotifyWorker.stop(MainActivity.this); }
+
+        @JavascriptInterface
+        public String notifyKey() { return NotifyWorker.prefs(MainActivity.this).getString("key", ""); }
+
         @JavascriptInterface
         public String saveFile(String name, String mime, String b64) {
             try {

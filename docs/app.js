@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=27';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=28';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "27";
+const APP_V = "28";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -1136,7 +1136,7 @@ document.addEventListener("click",e=>{
   else if(a==="drsave"){const mx=num(document.getElementById("dr_max").value),dd=parseInt(document.getElementById("dr_days").value.replace(/\s/g,""),10);if(!(mx>=0)||!(dd>=0)){toast("Raqamni to'g'ri kiriting");return}
     const v=Object.assign({},S.config,{debtMax:mx,debtDays:dd});S.config=v;run(sb.from("settings").upsert({key:"main",value:v}),"Saqlandi").then(render).catch(()=>{})}
   else if(a==="excel")mExcel();
-  else if(a==="logout"){closeDrawer();sb.auth.signOut()}
+  else if(a==="logout"){closeDrawer();stopNotify().finally(()=>sb.auth.signOut())}
 });
 document.getElementById("modalwrap").addEventListener("click",e=>{if(e.target.id==="modalwrap")closeModal()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")window.somsaBack();else if((e.key==="Enter"||e.key===" ")&&e.target.matches&&e.target.matches('[role="button"][data-act]')){e.preventDefault();e.target.click()}});
@@ -1158,7 +1158,16 @@ async function start(sess){
   try{await loadAll();applyQueued();saveCache()}
   catch(e){if(loadCache()){applyQueued();ready=true;render();toast("Internet yo'q — oxirgi saqlangan ma'lumotlar ko'rsatilmoqda");return}
     splash("Ma'lumotlarni yuklab bo'lmadi. Internetni tekshirib, dasturni qayta oching.");return}
-  ready=true;subscribe();render();flushQueue();
+  ready=true;subscribe();render();flushQueue();setupNotify();
+}
+/* Telefon xabarnomalari: APK'ga shu telefon uchun kalit beramiz (faqat yangi APK'da ishlaydi) */
+async function setupNotify(){
+  const N=window.SomsaNative;if(!N||typeof N.setNotifyKey!=="function"||typeof N.notifyKey!=="function"||!session)return;
+  try{if(N.notifyKey())return;const {data,error}=await sb.rpc("register_device");if(!error&&data)N.setNotifyKey(data)}catch(e){}
+}
+async function stopNotify(){
+  const N=window.SomsaNative;if(!N||typeof N.notifyKey!=="function")return;
+  try{const k=N.notifyKey();if(k){await sb.rpc("unregister_device",{dkey:k});N.clearNotifyKey()}}catch(e){}
 }
 let lastUser=undefined;
 sb.auth.onAuthStateChange((_ev,sess)=>{const uid=sess?sess.user.id:null;if(uid===lastUser){session=sess;return}lastUser=uid;setTimeout(()=>start(sess),0)});
