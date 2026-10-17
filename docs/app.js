@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=26';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=27';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "26";
+const APP_V = "27";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -451,7 +451,7 @@ function vQarzlar(){
   if(qseg==="bizga"){
     const R=debtRules();h+='<div class="small muted">Undirish qoidasi: qarz '+som(R.max)+' dan oshsa yoki '+R.days+' kundan ko\'p to\'lanmasa.'+(isMother()?'':' <button class="linkbtn" data-act="go" data-k="sozlama" style="padding:0;font-size:12px">o\'zgartirish</button>')+'</div>';
     h+='<div class="sec"><span>Do\'konlar</span><span class="sub">bosing — hisob-kitob varag\'i</span></div><div class="list">'+cl.sort((a,b)=>b.b-a.b).map(x=>{const st=sellRate(x.c.id);const di=debtInfo(x.c.id);
-      return '<div class="row" role="button" tabindex="0" data-act="akt" data-c="'+x.c.id+'" style="cursor:pointer"><div class="col"><span class="b">'+esc(x.c.name)+(di.flag?' <span class="pill bad">undirish</span>':"")+'</span><span class="small muted">'+(x.c.payMode==="darhol"?"darhol to'laydi":"ertasi kuni to'laydi")+(st!=null?" · sotilishi "+st+"%":"")+(di.bal>0&&di.since?" · "+di.days+" kunlik qarz":"")+'</span>'+(di.flag?'<span class="small" style="color:var(--bad);font-weight:600">'+esc(di.why)+'</span>':"")+'</div><span class="b num" style="white-space:nowrap;'+(di.flag?"color:var(--bad)":"")+'">'+som(x.b)+'</span></div>'}).join("")+'<div class="row"><span class="b">Jami</span><span class="xb num">'+som(bizga)+'</span></div></div>';
+      return '<div class="row" role="button" tabindex="0" data-act="akt" data-c="'+x.c.id+'" style="cursor:pointer"><div class="col"><span class="b">'+esc(x.c.name)+(di.flag?' <span class="pill bad">undirish</span>':"")+'</span><span class="small muted">'+(x.c.payMode==="darhol"?"darhol to'laydi":"ertasi kuni to'laydi")+(st!=null?" · sotilishi "+st+"%":"")+(di.bal>0&&di.since?" · "+(di.days?di.days+" kunlik qarz":"bugungi qarz"):"")+'</span>'+(di.flag?'<span class="small" style="color:var(--bad);font-weight:600">'+esc(di.why)+'</span>':"")+'</div><span class="b num" style="white-space:nowrap;'+(di.flag?"color:var(--bad)":"")+'">'+som(x.b)+'</span></div>'}).join("")+'<div class="row"><span class="b">Jami</span><span class="xb num">'+som(bizga)+'</span></div></div>';
   }else{
     h+='<div class="sec"><span>Kimga qarzmiz</span>'+(isMother()?'':'<button class="btn small" data-act="crednew">+ Qarz</button>')+'</div>';
     h+=cr.length?'<div class="list">'+cr.map(x=>'<div class="row" role="button" tabindex="0" data-act="cred" data-n="'+esc(x.name)+'" style="cursor:pointer"><div class="col"><span class="b">'+esc(x.name)+'</span><span class="small muted">'+(x.b>0?"to'lanmagan":"to'liq to'langan")+'</span></div><span class="b num" style="white-space:nowrap">'+som(x.b)+'</span></div>').join("")+'<div class="row"><span class="b">Jami</span><span class="xb num">'+som(biz)+'</span></div></div>':'<div class="card empty">Qarzimiz yo\'q. Xaridni "Qarzga" qilsangiz, shu yerga o\'zi tushadi.</div>';
