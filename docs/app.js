@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=22';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=23';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "22";
+const APP_V = "23";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -40,6 +40,7 @@ const ICONS = {
 };
 // Admin uchun pastki panel: eng ko'p ishlatiladigan bo'limlar. Qolganlari ☰ menyuda.
 const ADMIN_TABS = ["dashboard","bugun","yetkazish","ombor","kalkulyator"];
+const MOTHER_TABS = ["bugun","yetkazish","ombor","kalkulyator","kassa","qarzlar"];
 const TAB_NAMES = { kalk:"Kalkulyatsiya", kalkulyator:"Kalkulyator", kassa:"Hisob-kitob", qarzlar:"Qarzlar", uy:"Uyga", dashboard:"Dashboard", koproq:"Ko'proq", bugun:"Bugun", yetkazish:"Yetkazish", ombor:"Ombor", hisob:"Hisob", sozlama:"Sozlama" };
 
 const S = { types:{}, ings:{}, clients:{}, days:{}, moves:{}, debts:{}, payments:{}, expenses:{}, cashIn:{}, cred:{}, kassa:{}, semi:{}, config:{zaxira:2}, profiles:{} };
@@ -131,10 +132,10 @@ const LOAD = {
   debts: async()=>{const {data,error}=await sb.from("debts").select("*");if(error)throw error;S.debts=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,amount:+r.amount,note:r.note,date:r.date}]))},
   config: async()=>{const {data,error}=await sb.from("settings").select("*");if(error)throw error;const m=Object.fromEntries((data||[]).map(r=>[r.key,r.value]));S.config=m.main||{zaxira:2};S.kassa=m.kassa||{}},
   semi: async()=>{const {data,error}=await sb.from("semi").select("*");if(error)throw error;S.semi=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,recipe:r.recipe||[],yield:+r.yield,show:r.show,order:r.sort,stock:+r.stock,min:+r.min}]))},
-  cashIn: async()=>{if(!isAdmin()){S.cashIn={};return}const {data,error}=await sb.from("cash_in").select("*");if(error)throw error;S.cashIn=Object.fromEntries((data||[]).map(r=>[r.id,{date:r.date,amount:+r.amount,note:r.note,at:r.at}]))},
-  cred: async()=>{if(!isAdmin()){S.cred={};return}const {data,error}=await sb.from("creditor_ledger").select("*");if(error)throw error;S.cred=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,date:r.date,amount:+r.amount,note:r.note,cash:r.cash,at:r.at}]))},
+  cashIn: async()=>{if(!isStaff()){S.cashIn={};return}const {data,error}=await sb.from("cash_in").select("*");if(error)throw error;S.cashIn=Object.fromEntries((data||[]).map(r=>[r.id,{date:r.date,amount:+r.amount,note:r.note,at:r.at}]))},
+  cred: async()=>{if(!isStaff()){S.cred={};return}const {data,error}=await sb.from("creditor_ledger").select("*");if(error)throw error;S.cred=Object.fromEntries((data||[]).map(r=>[r.id,{name:r.name,date:r.date,amount:+r.amount,note:r.note,cash:r.cash,at:r.at}]))},
   payments: async()=>{const {data,error}=await sb.from("payments").select("*");if(error)throw error;S.payments=Object.fromEntries((data||[]).map(r=>[r.id,{client:r.client_id,date:r.date,amount:+r.amount,note:r.note,at:r.at}]))},
-  expenses: async()=>{if(!isAdmin()){S.expenses={};return}const {data,error}=await sb.from("expenses").select("*");if(error)throw error;S.expenses=Object.fromEntries((data||[]).map(r=>[r.id,{date:r.date,category:r.category,amount:+r.amount,note:r.note,at:r.at}]))},
+  expenses: async()=>{if(!isStaff()){S.expenses={};return}const {data,error}=await sb.from("expenses").select("*");if(error)throw error;S.expenses=Object.fromEntries((data||[]).map(r=>[r.id,{date:r.date,category:r.category,amount:+r.amount,note:r.note,at:r.at}]))},
   profiles: async()=>{const {data,error}=await sb.from("profiles").select("*");if(error)throw error;S.profiles=Object.fromEntries((data||[]).map(r=>[r.id,r]))}
 };
 const TABLE_KEY = { ingredients:"ings", somsa_types:"types", clients:"clients", days:"days", moves:"moves", debts:"debts", settings:"config", payments:"payments", expenses:"expenses", cash_in:"cashIn", creditor_ledger:"cred", semi:"semi" };
@@ -255,11 +256,11 @@ function render(){
     if(!VIEWS[tab]||tab==="koproq")tab="dashboard";
     allowed=ADMIN_TABS;
   }else{
-    allowed=["bugun","yetkazish"];
+    allowed=MOTHER_TABS;
     if(!allowed.includes(tab))tab="bugun";
   }
   const nav=document.getElementById("navin");
-  nav.style.gridTemplateColumns="repeat("+allowed.length+",minmax(0,1fr))";
+  nav.style.gridTemplateColumns="repeat("+allowed.length+",minmax(0,1fr))";document.getElementById("nav").classList.toggle("n6",allowed.length>5);
   nav.innerHTML=allowed.map(k=>'<button data-act="tab" data-k="'+k+'" class="'+(tab===k?"on":"")+'" aria-current="'+(tab===k?"page":"false")+'">'+svg(k)+'<span class="nl">'+TAB_NAMES[k]+'</span></button>').join("");
   document.getElementById("nav").hidden=false;
   const fn=VIEWS[tab];
@@ -401,12 +402,12 @@ function kassaBalance(){const st=S.kassa||{};let b=+st.start||0;for(const e of k
 function vKassa(){
   let h=backBar()+header("Hisob-kitob","Kassa: kirim va rasxod");
   const st=S.kassa||{};
-  h+='<div class="hero pat"><div class="lbl">Kassadagi pul</div><div class="xb num" style="font-size:34px;line-height:1.1">'+som(kassaBalance())+'</div><div class="hint">'+(st.date?"Boshlang'ich: "+som(st.start||0)+" ("+shortDate(st.date)+" dan)":"Boshlang'ich summa kiritilmagan")+' · <button class="linkbtn" data-act="kassastart" style="color:var(--on-navy-muted);padding:0;font-size:12px">o\'zgartirish</button></div></div>';
+  h+='<div class="hero pat"><div class="lbl">Kassadagi pul</div><div class="xb num" style="font-size:34px;line-height:1.1">'+som(kassaBalance())+'</div><div class="hint">'+(st.date?"Boshlang'ich: "+som(st.start||0)+" ("+shortDate(st.date)+" dan)":"Boshlang'ich summa kiritilmagan")+'+(isMother()?'':' · <button class="linkbtn" data-act="kassastart" style="color:var(--on-navy-muted);padding:0;font-size:12px">o\'zgartirish</button>')+'</div></div>';
   h+='<div class="grid2"><button class="btn" data-act="kirim">+ Kirim</button><button class="btn navy" data-act="exp">− Rasxod</button></div>';
   h+='<div class="chips">'+[["bugun","Bugun"],["hafta","7 kun"],["oy","Shu oy"]].map(([k,l])=>'<button class="chip '+(period===k?"on":"")+'" data-act="period" data-k="'+k+'">'+l+'</button>').join("")+'</div>';
   const ev=kassaEvents().filter(e=>inPeriod(e.date));const inn=ev.reduce((s,e)=>s+(e.inn||0),0),out=ev.reduce((s,e)=>s+(e.out||0),0);
   h+='<div class="grid2"><div class="card" style="gap:2px"><span class="small muted">Kirim</span><span class="xb num" style="font-size:18px;color:var(--ok)">+'+sp(inn)+'</span></div><div class="card" style="gap:2px"><span class="small muted">Rasxod</span><span class="xb num" style="font-size:18px;color:var(--bad)">−'+sp(out)+'</span></div></div>';
-  h+=ev.length?'<div class="list">'+ev.map(e=>{const del=e.kind?' role="button" tabindex="0" data-act="kdel" data-kind="'+e.kind+'" data-id="'+e.id+'" style="cursor:pointer"':"";
+  h+=ev.length?'<div class="list">'+ev.map(e=>{const del=e.kind&&!isMother()?' role="button" tabindex="0" data-act="kdel" data-kind="'+e.kind+'" data-id="'+e.id+'" style="cursor:pointer"':"";
     return '<div class="row"'+del+'><div class="col"><span class="b">'+esc(e.txt)+'</span><span class="small muted">'+shortDate(e.date)+(e.src?" · "+esc(e.src):"")+'</span></div><span class="b num" style="color:'+(e.inn?"var(--ok)":"var(--bad)")+';white-space:nowrap">'+(e.inn?"+"+sp(e.inn):"−"+sp(e.out))+'</span></div>'}).join("")+'</div>':'<div class="card empty">Bu davrda kirim yoki rasxod yo\'q.</div>';
   return h;
 }
@@ -448,11 +449,11 @@ function vQarzlar(){
   const cr=credBalances();const biz=cr.reduce((s,x)=>s+Math.max(0,x.b),0);
   h+='<div class="grid2"><button class="card" data-act="qseg" data-k="bizga" style="gap:2px;text-align:left;border:2px solid '+(qseg==="bizga"?"var(--orange)":"transparent")+'"><span class="small muted">Bizga qarzlar</span><span class="xb num" style="font-size:19px">'+sp(bizga)+'</span></button><button class="card" data-act="qseg" data-k="biz" style="gap:2px;text-align:left;border:2px solid '+(qseg==="biz"?"var(--orange)":"transparent")+'"><span class="small muted">Bizning qarzlarimiz</span><span class="xb num" style="font-size:19px">'+sp(biz)+'</span></button></div>';
   if(qseg==="bizga"){
-    const R=debtRules();h+='<div class="small muted">Undirish qoidasi: qarz '+som(R.max)+' dan oshsa yoki '+R.days+' kundan ko\'p to\'lanmasa. <button class="linkbtn" data-act="go" data-k="sozlama" style="padding:0;font-size:12px">o\'zgartirish</button></div>';
+    const R=debtRules();h+='<div class="small muted">Undirish qoidasi: qarz '+som(R.max)+' dan oshsa yoki '+R.days+' kundan ko\'p to\'lanmasa.+(isMother()?'':' <button class="linkbtn" data-act="go" data-k="sozlama" style="padding:0;font-size:12px">o\'zgartirish</button>')+'</div>';
     h+='<div class="sec"><span>Do\'konlar</span><span class="sub">bosing — hisob-kitob varag\'i</span></div><div class="list">'+cl.sort((a,b)=>b.b-a.b).map(x=>{const st=sellRate(x.c.id);const di=debtInfo(x.c.id);
       return '<div class="row" role="button" tabindex="0" data-act="akt" data-c="'+x.c.id+'" style="cursor:pointer"><div class="col"><span class="b">'+esc(x.c.name)+(di.flag?' <span class="pill bad">undirish</span>':"")+'</span><span class="small muted">'+(x.c.payMode==="darhol"?"darhol to'laydi":"ertasi kuni to'laydi")+(st!=null?" · sotilishi "+st+"%":"")+(di.bal>0&&di.since?" · "+di.days+" kunlik qarz":"")+'</span>'+(di.flag?'<span class="small" style="color:var(--bad);font-weight:600">'+esc(di.why)+'</span>':"")+'</div><span class="b num" style="white-space:nowrap;'+(di.flag?"color:var(--bad)":"")+'">'+som(x.b)+'</span></div>'}).join("")+'<div class="row"><span class="b">Jami</span><span class="xb num">'+som(bizga)+'</span></div></div>';
   }else{
-    h+='<div class="sec"><span>Kimga qarzmiz</span><button class="btn small" data-act="crednew">+ Qarz</button></div>';
+    h+='<div class="sec"><span>Kimga qarzmiz</span>'+(isMother()?'':'<button class="btn small" data-act="crednew">+ Qarz</button>')+'</div>';
     h+=cr.length?'<div class="list">'+cr.map(x=>'<div class="row" role="button" tabindex="0" data-act="cred" data-n="'+esc(x.name)+'" style="cursor:pointer"><div class="col"><span class="b">'+esc(x.name)+'</span><span class="small muted">'+(x.b>0?"to'lanmagan":"to'liq to'langan")+'</span></div><span class="b num" style="white-space:nowrap">'+som(x.b)+'</span></div>').join("")+'<div class="row"><span class="b">Jami</span><span class="xb num">'+som(biz)+'</span></div></div>':'<div class="card empty">Qarzimiz yo\'q. Xaridni "Qarzga" qilsangiz, shu yerga o\'zi tushadi.</div>';
   }
   return h;
@@ -460,9 +461,9 @@ function vQarzlar(){
 function mCred(name){
   const rows=Object.entries(S.cred).map(([id,c])=>({id,...c})).filter(c=>c.name===name).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.at).localeCompare(String(a.at)));
   const bal=rows.reduce((s,c)=>s+c.amount,0);
-  let h=mHead(name)+'<div class="card" style="gap:2px"><span class="small muted">Qolgan qarzimiz</span><span class="xb num" style="font-size:24px">'+som(bal)+'</span></div><div class="grid2"><button class="btn" id="cr_pay">To\'lash</button><button class="btn ghost" id="cr_add">+ Qarz qo\'shish</button></div>';
+  let h=mHead(name)+'<div class="card" style="gap:2px"><span class="small muted">Qolgan qarzimiz</span><span class="xb num" style="font-size:24px">'+som(bal)+'</span></div><div class="grid2"><button class="btn" id="cr_pay">To\'lash</button>'+(isMother()?'':'<button class="btn ghost" id="cr_add">+ Qarz qo\'shish</button>')+'</div>';
   h+=rows.length?'<div class="list">'+rows.map(c=>'<div class="row"><div class="col"><span class="b">'+(c.amount>0?"Qarz olindi":"To'landi"+(c.cash?" (kassadan)":""))+'</span><span class="small muted">'+shortDate(c.date)+(c.note?" · "+esc(c.note):"")+'</span></div><span class="b num" style="color:'+(c.amount>0?"var(--bad)":"var(--ok)")+'">'+(c.amount>0?"+":"−")+sp(Math.abs(c.amount))+'</span></div>').join("")+'</div>':"";
-  openModal(h,m=>{m.querySelector("#cr_pay").addEventListener("click",()=>mCredEntry(name,-1,bal));m.querySelector("#cr_add").addEventListener("click",()=>mCredEntry(name,1,bal))});
+  openModal(h,m=>{m.querySelector("#cr_pay").addEventListener("click",()=>mCredEntry(name,-1,bal));const ca=m.querySelector("#cr_add");if(ca)ca.addEventListener("click",()=>mCredEntry(name,1,bal))});
 }
 function mCredEntry(name,sign,bal){
   const pay=sign<0;
@@ -692,7 +693,8 @@ async function saveDelivery(cid,given,returned,paid,fromRet){
 /* OMBOR */
 function vOmbor(){
   let h=backBar()+header("Ombor","Qoldiq chegaradan kamaysa, xabar chiqadi");
-  h+='<div class="grid2"><button class="btn" data-act="xarid">Xarid</button><button class="btn navy" data-act="tayyor">Tayyorlash</button><button class="btn ghost" data-act="uyga">Uyga o\'tkazish</button><button class="btn ghost" data-act="sanash">Sanash</button></div><button class="linkbtn" data-act="go" data-k="uy" style="align-self:flex-start;padding:2px 0">Uyga o\'tkazilganlar ro\'yxati →</button>';
+  if(isMother())h+='<div class="grid3"><button class="btn navy" data-act="tayyor">Tayyorlash</button><button class="btn ghost" data-act="uyga">Uyga o\'tkazish</button><button class="btn ghost" data-act="sanash">Sanash</button></div>';
+  else h+='<div class="grid2"><button class="btn" data-act="xarid">Xarid</button><button class="btn navy" data-act="tayyor">Tayyorlash</button><button class="btn ghost" data-act="uyga">Uyga o\'tkazish</button><button class="btn ghost" data-act="sanash">Sanash</button></div><button class="linkbtn" data-act="go" data-k="uy" style="align-self:flex-start;padding:2px 0">Uyga o\'tkazilganlar ro\'yxati →</button>';
   const list=stockItems();
   if(!list.length)return h+'<div class="card empty">Masalliqlar hali kiritilmagan.</div>';
   if(!Object.values(S.moves).some(m=>m.kind==="sanash"||m.kind==="xarid"))h+='<div class="alert"><b>Ombor hali sanalmagan</b><span>Boshlash uchun "Sanash" tugmasini bosib, hozir bor masalliqni kiriting.</span></div>';
@@ -928,7 +930,7 @@ function mSanash(){
   h+=list.map(i=>'<div class="card" style="gap:6px"><span class="b">'+esc(i.name)+' <span class="small muted">hisob bo\'yicha '+showQty(+i.stock||0,i)+'</span></span><div class="inrow"><input class="inp num" id="sq_'+domId(i.id)+'" inputmode="decimal" placeholder="Haqiqiy qoldiq" aria-label="'+esc(i.name)+' qoldig\'i"><span class="tag">'+uinfo(i).name+'</span></div></div>').join("");
   h+='<button class="btn wide" id="s_save" style="min-height:52px">Saqlash</button>';
   openModal(h,m=>{m.querySelector("#s_save").addEventListener("click",async()=>{const items=[],w=[];
-    for(const i of list){const raw=m.querySelector("#sq_"+domId(i.id)).value;if(raw.trim()==="")continue;const v=num(raw);if(isNaN(v)||v<0)continue;const base=v*uinfo(i).f;items.push({ing:i.id,expected:+i.stock||0,actual:base});w.push(i.semi?sb.from("semi").update({stock:base}).eq("id",i.id.slice(2)):sb.from("ingredients").update({stock:base}).eq("id",i.id))}
+    for(const i of list){const raw=m.querySelector("#sq_"+domId(i.id)).value;if(raw.trim()==="")continue;const v=num(raw);if(isNaN(v)||v<0)continue;const base=v*uinfo(i).f;items.push({ing:i.id,expected:+i.stock||0,actual:base});w.push(sb.rpc("set_stock",{item:i.semi?"s:"+i.id.slice(2):i.id,val:base}))}
     if(!items.length){toast("Hech narsa kiritilmadi");return}
     try{const rs=await Promise.all(w);if(rs.some(r=>r.error))throw 1;await run(sb.from("moves").insert({kind:"sanash",date:ymd(new Date()),items,total:0}),"Qoldiq yangilandi");closeModal()}catch(e){toast("Saqlanmadi")}})});
 }
@@ -938,7 +940,7 @@ function mTayyor(){
   openModal(mHead("Tayyorlash")+'<div class="field"><label for="ty_semi">Nima tayyorlandi</label><select class="inp" id="ty_semi">'+list.map(sm=>'<option value="'+sm.id+'">'+esc(sm.name)+'</option>').join("")+'</select></div>'+
     '<div class="field"><label for="ty_in" id="ty_in_l">Qancha solindi</label><div class="inrow"><input class="inp num" id="ty_in" inputmode="decimal"><span class="tag" id="ty_in_u"></span></div></div>'+
     '<div class="field"><label for="ty_q">Qancha chiqdi</label><div class="inrow"><input class="inp num" id="ty_q" inputmode="decimal"><span class="tag">kg</span></div></div>'+
-    '<div class="card" id="ty_use" style="gap:4px"></div><label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="ty_upd"> Kalkulyatsiyadagi chiqishni shu bo\'yicha yangilash</label>'+
+    '<div class="card" id="ty_use" style="gap:4px"></div><label class="small" style="display:'+(isMother()?"none":"flex")+';gap:8px;align-items:center"><input type="checkbox" id="ty_upd"> Kalkulyatsiyadagi chiqishni shu bo\'yicha yangilash</label>'+
     '<div class="err" id="ty_err" style="color:var(--bad)"></div><button class="btn wide" id="ty_save">Saqlash</button>',m=>{
     const sel=m.querySelector("#ty_semi"),inp=m.querySelector("#ty_in"),q=m.querySelector("#ty_q");
     // Asosiy masalliq — retseptdagi eng ko'p miqdorli qator (masalan go'sht yoki un)

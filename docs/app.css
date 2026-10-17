@@ -124,3 +124,6 @@ pre.nak{white-space:pre-wrap;background:var(--card);border-radius:12px;padding:1
 .mitem svg{flex:none;color:var(--muted)}
 .mitem.on{background:var(--card)}
 .mitem.on svg{color:var(--orange)}
+
+.nav.n6 button{font-size:10px;gap:3px}
+.nav.n6 button svg{width:20px;height:20px}
