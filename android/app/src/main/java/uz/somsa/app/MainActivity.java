@@ -47,7 +47,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(Color.parseColor("#9A3412"));
+        getWindow().setStatusBarColor(Color.parseColor("#162538"));
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.parseColor(BG));
@@ -156,7 +156,7 @@ public class MainActivity extends AppCompatActivity {
         TextView title = new TextView(this);
         title.setText("Internetga ulanib bo'lmadi");
         title.setTextSize(20);
-        title.setTextColor(Color.parseColor("#1E1A17"));
+        title.setTextColor(Color.parseColor("#162538"));
         title.setGravity(Gravity.CENTER);
         TextView text = new TextView(this);
         text.setText("Aloqani tekshirib, qayta urinib ko'ring.");

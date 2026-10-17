@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Somsa" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="colorPrimary">#9A3412</item>
-        <item name="colorPrimaryDark">#7C2D12</item>
-        <item name="colorAccent">#9A3412</item>
+        <item name="colorPrimary">#162538</item>
+        <item name="colorPrimaryDark">#162538</item>
+        <item name="colorAccent">#FFA22A</item>
         <item name="android:windowBackground">@color/bg</item>
-        <item name="android:navigationBarColor">#FFFFFF</item>
+        <item name="android:statusBarColor">#162538</item>
+        <item name="android:navigationBarColor">#162538</item>
     </style>
 </resources>
