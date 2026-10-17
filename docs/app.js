@@ -1,10 +1,10 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=21';
+import { markSvg, lockupH, wordmarkV, patternUrl } from './brand.js?v=22';
 document.documentElement.style.setProperty('--pattern', patternUrl());
 
 // Yangi versiya chiqqan bo'lsa, telefondagi eski nusxa o'rniga darhol yangisini yuklaydi.
 // Har yangilanishda APP_V, version.json va index.html'dagi ?v= raqami birga oshiriladi.
-const APP_V = "21";
+const APP_V = "22";
 async function checkVersion(){
   try{
     const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const {v}=await r.json();
@@ -591,10 +591,18 @@ function delivState(c){
   return {dl,z,prev,ts,given,prevTs,returned,priceMap,givenSum,retSum,prevSum,mode,due,before,zSum:sumObj(z)};
 }
 let selShop=null;const SD={};
+/* Qaytgan somsalar havzasi: shu kuni boshqa do'konlardan qaytgan, hali boshqa do'konga berilmagan */
+function retPool(d,exceptCid){const p={};const dls=day(d).deliveries||{};
+  for(const cid in dls){if(cid===exceptCid)continue;const dl=dls[cid];if(!dl||!dl.done)continue;
+    for(const t in dl.returned||{})p[t]=(p[t]||0)+(+dl.returned[t]||0);
+    for(const t in dl.fromRet||{})p[t]=(p[t]||0)-(+dl.fromRet[t]||0)}
+  for(const t in p)if(p[t]<0)p[t]=0;return p}
+function retStats(d){let r=0,f=0;const dls=day(d).deliveries||{};for(const cid in dls){const dl=dls[cid];if(!dl||!dl.done)continue;r+=sumObj(dl.returned);f+=sumObj(dl.fromRet)}return {r,f,left:Math.max(0,r-f)}}
 function shopDraft(c){const k=viewDate+"|"+c.id;if(!SD[k]){const s=delivState(c);const dl=s.dl;
-  SD[k]={given:Object.assign({},s.given),ret:Object.assign({},dl?dl.returned||{}:{}),paid:dl&&dl.done?String(Math.round(dl.paid||0)):"",edit:!(dl&&dl.done)}}return SD[k]}
+  const fr=Object.assign({},dl&&dl.fromRet||{});const g=Object.assign({},s.given);for(const t in fr)g[t]=Math.max(0,(+g[t]||0)-(+fr[t]||0));
+  SD[k]={given:g,fr,ret:Object.assign({},dl?dl.returned||{}:{}),paid:dl&&dl.done?String(Math.round(dl.paid||0)):"",edit:!(dl&&dl.done)}}return SD[k]}
 function shopCalc(c,sd){const s=delivState(c);
-  const lines=s.ts.filter(t=>+sd.given[t]>0).map(t=>({t,n:+sd.given[t],p:s.priceMap[t]||cprice(c,t)}));
+  const fr=sd.fr||{};const lines=[];for(const t of s.ts){const p=s.priceMap[t]||cprice(c,t);if(+sd.given[t]>0)lines.push({t,n:+sd.given[t],p});if(+fr[t]>0)lines.push({t,n:+fr[t],p,fr:1})}
   const gs=lines.reduce((x,l)=>x+l.n*l.p,0);
   const rs=Object.keys(sd.ret).reduce((x,t)=>x+(+sd.ret[t]||0)*((s.prev&&s.prev.priceMap&&s.prev.priceMap[t])||cprice(c,t)),0);
   const before=clientBalance(c.id,addDays(viewDate,-1));const total=before+gs-rs;const paid=Math.max(0,num(sd.paid)||0);
@@ -605,7 +613,9 @@ function vYetkazish(){
   const cl=clients().filter(c=>{const z=sumObj(ordersOf(viewDate)[c.id]);const dl=(day(viewDate).deliveries||{})[c.id];const prev=prevDelivery(c.id,viewDate);return z>0||dl||(prev&&prev.date===addDays(viewDate,-1)&&sumObj(prev.given)>0)});
   if(!cl.length)return h+'<div class="card empty"><b>Bu kunga zakaz yo\'q</b><span>Zakazlar "Bugun" bo\'limida kiritiladi.</span></div>';
   const dls=day(viewDate).deliveries||{};const doneN=cl.filter(c=>(dls[c.id]||{}).done).length;
-  h+='<div class="sec"><span>'+doneN+' / '+cl.length+' do\'kon bajarildi</span></div><div class="list">';
+  h+='<div class="sec"><span>'+doneN+' / '+cl.length+' do\'kon bajarildi</span></div>';
+  {const rs=retStats(viewDate);if(rs.r)h+='<div class="card" style="gap:4px"><div class="ingrow"><span>Bugun qaytdi</span><span class="b num">'+rs.r+' ta</span></div><div class="ingrow"><span>Boshqa do\'konga berildi</span><span class="b num">'+rs.f+' ta</span></div><div class="ingrow"><span class="b">Qo\'lda qoldi</span><span class="xb num" style="color:'+(rs.left?"var(--warn)":"var(--ok)")+'">'+rs.left+' ta</span></div></div>'}
+  h+='<div class="list">';
   for(const c of cl){const dl=dls[c.id];const done=dl&&dl.done;const z=sumObj(ordersOf(viewDate)[c.id]);const di=debtInfo(c.id);
     let right;
     if(done)right='<span class="b num">'+sumObj(dl.given)+' ta</span><span class="pill ok">Berildi · '+sp(dl.paid||0)+'</span>';
@@ -621,6 +631,7 @@ function vShop(c){
     const dl=s.dl;const gSum=sumObj(dl.given);
     h+='<div class="hero pat"><div class="grid2"><div><div class="lbl">Berildi</div><div><span class="big num">'+gSum+'</span> <span class="unit">ta</span></div>'+(zSum&&zSum!==gSum?'<div class="hint">zakaz '+zSum+' ta edi</div>':"")+'</div><div><div class="lbl">Olindi</div><div class="xb num" style="font-size:24px;color:var(--orange);line-height:1.6">'+sp(dl.paid||0)+'</div></div></div></div>';
     h+='<div class="card">'+Object.keys(dl.given).filter(t=>dl.given[t]).map(t=>{const p=(dl.priceMap||{})[t]||cprice(c,t);return '<div class="ingrow"><span>'+esc((S.types[t]||{}).name||t)+' '+dl.given[t]+' × '+sp(p)+'</span><span class="b num">'+sp(dl.given[t]*p)+'</span></div>'}).join("")+
+      (sumObj(dl.fromRet)?'<div class="ingrow"><span class="small muted">Shundan qaytgan somsadan: '+sumObj(dl.fromRet)+' ta</span><span></span></div>':"")+
       (sumObj(dl.returned)?'<div class="ingrow"><span>Qaytdi '+sumObj(dl.returned)+' ta</span><span class="b num">−'+sp(dl.retSum||0)+'</span></div>':"")+
       '<div class="ingrow"><span>Olindi</span><span class="b num">−'+sp(dl.paid||0)+'</span></div><div class="ingrow"><span class="b">Hozirgi qarzi</span><span class="xb num" style="color:'+(clientBalance(c.id)>0?"var(--bad)":"var(--ok)")+'">'+som(clientBalance(c.id))+'</span></div></div>';
     h+='<div class="grid2"><button class="btn ghost" data-act="nak" data-c="'+c.id+'">Nakladnoy</button><button class="btn ghost" data-act="shopedit">O\'zgartirish</button></div>';
@@ -634,6 +645,9 @@ function vShop(c){
     return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="col"><span>'+esc(S.types[t].name)+'</span><span class="small" id="gd_'+t+'" style="color:var(--warn)">'+(v!==zz?(v<zz?"zakazdan "+(zz-v)+" ta kam":"zakazdan "+(v-zz)+" ta ko\'p"):"")+'</span></span>'+stp("g",t,v)+'</div>'}).join("")+'</div>';
   // 3. Qaytdi (ixtiyoriy)
   if(s.prevTs.length)h+='<div class="card"><div class="sec"><span>Qaytdi</span><span class="sub">'+shortDate(s.prev.date)+': '+sumObj(s.prev.given)+' ta berilgan</span></div>'+s.prevTs.map(t=>'<div style="display:flex;justify-content:space-between;align-items:center"><span>'+esc(S.types[t].name)+'</span>'+stp("r",t,+sd.ret[t]||0)+'</div>').join("")+'</div>';
+  // 3b. Boshqa do'konlardan qaytganidan berish
+  {const pool=retPool(viewDate,c.id);const pts=s.ts.filter(t=>(pool[t]||0)>0||(+sd.fr[t]||0)>0);
+    if(pts.length)h+='<div class="card"><div class="sec"><span>Qaytgandan berish</span></div><div class="small muted">Bugun boshqa do\'konlardan qaytgan somsadan shu do\'konga berilsa, sonini yozing. Zakazga qo\'shimcha hisoblanadi.</div>'+pts.map(t=>'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="col"><span>'+esc(S.types[t].name)+'</span><span class="small muted">bor: '+(pool[t]||0)+' ta</span></span>'+stp("f",t,+sd.fr[t]||0)+'</div>').join("")+'</div>'}
   // 4. Hisob + olingan pul
   h+='<div class="card" id="shopcalc">'+shopCalcHtml(c,k)+'</div>';
   h+='<div class="card"><div class="field"><label for="sd_paid" class="b">Olingan pul (so\'m)</label><input class="inp num" id="sd_paid" data-sdin="paid" inputmode="numeric" placeholder="0" value="'+esc(sd.paid)+'" style="font-size:22px;font-weight:800;min-height:56px"></div><div class="grid2" id="sd_quick">'+shopQuick(k)+'</div><div id="sd_left">'+shopLeft(k)+'</div></div>';
@@ -643,7 +657,7 @@ function vShop(c){
   return h;
 }
 function shopCalcHtml(c,k){
-  let h='<div class="sec"><span>Hisob</span></div>'+k.lines.map(l=>'<div class="ingrow"><span>'+esc(S.types[l.t].name)+' '+l.n+' × '+sp(l.p)+'</span><span class="b num">'+sp(l.n*l.p)+'</span></div>').join("");
+  let h='<div class="sec"><span>Hisob</span></div>'+k.lines.map(l=>'<div class="ingrow"><span>'+esc(S.types[l.t].name)+(l.fr?' <span class="small muted">(qaytgandan)</span>':'')+' '+l.n+' × '+sp(l.p)+'</span><span class="b num">'+sp(l.n*l.p)+'</span></div>').join("");
   if(!k.lines.length)h+='<div class="ingrow"><span>Bugun somsa berilmadi</span><span class="b num">0</span></div>';
   if(k.rs)h+='<div class="ingrow"><span>Qaytgan somsa</span><span class="b num">−'+sp(k.rs)+'</span></div>';
   h+='<div class="ingrow"><span class="b">Bugungi summa</span><span class="xb num">'+som(k.gs-k.rs)+'</span></div>';
@@ -659,17 +673,19 @@ function shopRefresh(){const c=clientOf(selShop);if(!c)return;const sd=shopDraft
   const q=id=>document.getElementById(id);if(q("shopcalc"))q("shopcalc").innerHTML=shopCalcHtml(c,k);if(q("sd_quick"))q("sd_quick").innerHTML=shopQuick(k);if(q("sd_left"))q("sd_left").innerHTML=shopLeft(k);
   const z=delivState(c).z||{};for(const t in sd.given){const el=q("gd_"+t);if(!el)continue;const v=+sd.given[t]||0,zz=+z[t]||0;el.textContent=v!==zz?(v<zz?"zakazdan "+(zz-v)+" ta kam":"zakazdan "+(v-zz)+" ta ko'p"):""}}
 document.addEventListener("input",e=>{const el=e.target.closest&&e.target.closest("[data-sdin]");if(!el||!selShop)return;const c=clientOf(selShop);const sd=shopDraft(c);const kd=el.dataset.sdin;
-  if(kd==="paid")sd.paid=el.value.replace(/[^\d]/g,"");else{const obj=kd==="g"?sd.given:sd.ret;obj[el.dataset.t]=Math.max(0,parseInt(el.value.replace(/\s/g,""),10)||0)}shopRefresh()});
+  if(kd==="paid")sd.paid=el.value.replace(/[^\d]/g,"");else if(kd==="f"){const t=el.dataset.t;const mx=retPool(viewDate,c.id)[t]||0;const v=Math.min(mx,Math.max(0,parseInt(el.value.replace(/\s/g,""),10)||0));sd.fr[t]=v;if(String(v)!==el.value)el.value=v}
+  else{const obj=kd==="g"?sd.given:sd.ret;obj[el.dataset.t]=Math.max(0,parseInt(el.value.replace(/\s/g,""),10)||0)}shopRefresh()});
 async function shopSave(){const c=clientOf(selShop);const sd=shopDraft(c);const k=shopCalc(c,sd);
-  const given={},ret={};for(const t in sd.given)given[t]=+sd.given[t]||0;for(const t in sd.ret)if(+sd.ret[t])ret[t]=+sd.ret[t];
-  const d=viewDate;await saveDelivery(c.id,given,ret,k.paid);
+  const given={},ret={},fr={};const pool=retPool(viewDate,c.id);for(const t in sd.given)given[t]=+sd.given[t]||0;for(const t in sd.ret)if(+sd.ret[t])ret[t]=+sd.ret[t];
+  for(const t in sd.fr){const v=Math.min(+sd.fr[t]||0,pool[t]||0);if(v>0){fr[t]=v;given[t]=(given[t]||0)+v}}
+  const d=viewDate;await saveDelivery(c.id,given,ret,k.paid,fr);
   if(((day(d).deliveries||{})[c.id]||{}).done){delete SD[d+"|"+c.id];selShop=null;window.scrollTo(0,0);render();toast(k.after>=1?"Saqlandi. Qarzga: "+som(k.after):"Saqlandi")}}
-async function saveDelivery(cid,given,returned,paid){
+async function saveDelivery(cid,given,returned,paid,fromRet){
   const c=clientOf(cid);const d=viewDate;const s=delivState(c);
   const givenSum=Object.keys(given).reduce((x,t)=>x+(+given[t]||0)*(s.priceMap[t]||cprice(c,t)),0);
   const retSum=Object.keys(returned).reduce((x,t)=>x+(+returned[t]||0)*((s.prev&&s.prev.priceMap&&s.prev.priceMap[t])||cprice(c,t)),0);
   const deliveries=Object.assign({},day(d).deliveries||{});
-  deliveries[cid]={given,returned,paid:Math.max(0,paid),done:true,givenSum,retSum,priceMap:s.priceMap,at:new Date().toISOString(),by:session.user.id};
+  deliveries[cid]={given,returned,paid:Math.max(0,paid),done:true,fromRet:fromRet||((deliveries[cid]||{}).fromRet)||{},givenSum,retSum,priceMap:s.priceMap,at:new Date().toISOString(),by:session.user.id};
   try{await saveDay(d,{orders:ordersOf(d),deliveries});delete drafts[cid];toast("Saqlandi");render()}catch(e){}
 }
 
@@ -1099,7 +1115,7 @@ document.addEventListener("click",e=>{
   else if(a==="shopcancel"){delete SD[viewDate+"|"+selShop];render()}
   else if(a==="shopsave")shopSave();
   else if(a==="sdpaid"){const c=clientOf(selShop);if(!c)return;shopDraft(c).paid=b.dataset.v;const el=document.getElementById("sd_paid");if(el)el.value=groupDigits(b.dataset.v);shopRefresh()}
-  else if(a==="sd"){const c=clientOf(selShop);if(!c)return;const sd=shopDraft(c);const obj=b.dataset.k==="g"?sd.given:sd.ret;const t=b.dataset.t;obj[t]=Math.max(0,(+obj[t]||0)+(+b.dataset.n));
+  else if(a==="sd"){const c=clientOf(selShop);if(!c)return;const sd=shopDraft(c);const kk=b.dataset.k;const obj=kk==="g"?sd.given:kk==="f"?sd.fr:sd.ret;const t=b.dataset.t;obj[t]=Math.max(0,(+obj[t]||0)+(+b.dataset.n));if(kk==="f")obj[t]=Math.min(obj[t],retPool(viewDate,c.id)[t]||0);
     const inp=document.querySelector('[data-sdin="'+b.dataset.k+'"][data-t="'+t+'"]');if(inp)inp.value=obj[t];shopRefresh()}
   else if(a==="nak")mNak(b.dataset.c);
   else if(a==="xarid")mXarid2();else if(a==="tayyor")mTayyor();else if(a==="edsemi")mSemi(b.dataset.id);else if(a==="uyga")mUyga();else if(a==="uydel")mUyDel(b.dataset.kind,b.dataset.id);else if(a==="uyexp")mUyExp();else if(a==="sanash")mSanash();
